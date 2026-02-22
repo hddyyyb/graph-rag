@@ -16,13 +16,13 @@ class Document:  # 表示一个原始文档
 
 
 @dataclass(frozen=True)  
-class IngestResult:  # IngestService返回IngestResult, 用于返回“写入成功，切了多少块”
+class IngestResult:  # IngestService返回IngestResult, 表示写入后的结果
     doc_id: str
     chunks: int
 
 
 @dataclass(frozen=True)
-class RetrievedChunk:    # VectorStore返回RetrievedChunk,GraphRAG的核心对象：它代表“一条检索到的片段”。vector_store.search返回的就是这个。
+class RetrievedChunk:    # VectorStore返回RetrievedChunk?
     doc_id: str
     chunk_id: str
     text: str
