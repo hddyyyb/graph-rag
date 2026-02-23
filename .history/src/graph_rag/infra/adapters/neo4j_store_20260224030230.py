@@ -8,14 +8,8 @@ from graph_rag.ports.graph_store import GraphStorePort
 
 class InMemoryGraphStore(GraphStorePort):
     """
-    Day2代替Neo4j: 用最简单的倒排/子串匹配模拟"图检索"结果。
-    Day3接Neo4j后, 把search实现换成Cypher+图遍历/社区/实体扩展。
-
-    作用: 实现GraphStorePort接口(Day2用内存模拟Neo4j图检索)。
-        upsert_document()存每个doc的chunks
-        search()用非常粗的子串/词重叠匹配, 返回RetrievedChunk(source="graph")
-    目的: 先把"双通道(vector+graph)"接口打通
-    Day3换成Neo4j+Cypher+图扩展策略
+    Day2代替Neo4j：用最简单的倒排/子串匹配模拟“图检索”结果。
+    Day3接Neo4j后，把search实现换成Cypher+图遍历/社区/实体扩展。
     """
 
     def __init__(self) -> None:

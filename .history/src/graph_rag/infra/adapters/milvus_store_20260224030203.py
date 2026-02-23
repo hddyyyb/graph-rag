@@ -7,12 +7,6 @@ from graph_rag.domain.models import RetrievedChunk
 from graph_rag.ports.vector_store import VectorStorePort
 
 
-'''
-InMemoryVectorStore保存(doc_id, chunk_id) -> (text, embedding)
-search()用cosine相似度做top_k检索
-目的：先把“向量写入+向量检索”链路跑通
-Day3换成真正Milvus适配器。
-'''
 def _cosine(a: List[float], b: List[float]) -> float:
     dot = 0.0
     na = 0.0

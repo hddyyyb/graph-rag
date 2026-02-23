@@ -6,25 +6,10 @@ from typing import List
 from graph_rag.ports.embedding import EmbeddingProviderPort
 
 
-class HashEmbeddingProvider(EmbeddingProviderPort):  # 实现EmbeddingProviderPort接口
+class HashEmbeddingProvider(EmbeddingProviderPort):
     """
     Day2最小可用Embedding：用hash生成稳定向量（不依赖外部模型）。
     Day3再替换成OpenAI/本地embedding/llama.cpp等。
-
-    HashEmbeddingProvider把文本做hash生成固定维度向量
-    目的：不依赖外部模型/网络，保证Day2闭环可跑、可测试
-    Day3替换成真实embedding（OpenAI/本地模型）时，上层不用改：
-    只需要改 infra层（adapters + DI容器）：
-
-        class OpenAIEmbeddingProvider(EmbeddingProviderPort):
-            def embed_texts(...):
-                # 调OpenAI API
-        
-        修改DI容器, 在 api/main.py 里
-        embedder = HashEmbeddingProvider(dim=32)
-        改成
-        embedder = OpenAIEmbeddingProvider(api_key=...)
-
     """
 
     def __init__(self, dim: int = 32) -> None:

@@ -8,12 +8,8 @@ from graph_rag.ports.kernel import RAGKernelPort
 
 class SimpleKernel(RAGKernelPort):
     """
-    Day2最小Kernel:把检索到的上下文拼起来，输出结构化可解释的回答。
-    Day3再替换成LlamaIndex/可插拔LLM(并接prompt模板、流式输出等)。
-    作用:实现RAGKernelPort接口(Day2用最简生成器替代LlamaIndex/LLM)。
-    SimpleKernel.generate_answer()把检索到的chunk拼成可读回答
-    目的:让QueryService能返回一个“可解释、可测试”的answer
-    Day3替换成LlamaIndex pipeline或真实LLM调用。
+    Day2最小Kernel：把检索到的上下文拼起来，输出结构化可解释的回答。
+    Day3再替换成LlamaIndex/可插拔LLM（并接prompt模板、流式输出等）。
     """
 
     def generate_answer(self, query: str, contexts: List[RetrievedChunk]) -> str:
