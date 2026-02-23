@@ -8,13 +8,13 @@ from typing import Any, Dict
 
 from graph_rag.ports.observability import TracePort
 
-_trace_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")  # contextvars保证：每个协程有自己的trace_id, 线程安全, 异步安全
+_trace_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")  # 存当前上下文的trace_id字符串
 _bound_fields_var: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
-    "bound_fields", default={}
-)  # 每个请求独立存系统里想追踪的上下文：比如doc_id、user_id、query、tenant等
+    "bound_fields", default=None
+)
+# 但这里有个小坑：default={}是可变对象，理论上不推荐（虽然ContextVar的行为会让它没那么容易出大事，但仍建议用default=None更稳，然后每次get后创建新dict）。
 
-
-class SimpleTrace(TracePort):
+class SimpleTrace(TracePort):    # 这是Ports层接口的Infra实现
     def get_trace_id(self) -> str:
         tid = _trace_id_var.get()
         if not tid:
@@ -25,8 +25,8 @@ class SimpleTrace(TracePort):
     def set_trace_id(self, trace_id: str) -> None:
         _trace_id_var.set(trace_id or uuid.uuid4().hex)
 
-    def bind(self, **fields: Any) -> None:    # 绑定上下文字段, 后续所有日志都会带这个字段
-        cur = dict(_bound_fields_var.get() or {})    # ContextVar.get()取当前上下文里的值， 返回{"user_id": 123}或None， 复制一份新的dict，避免修改原对象。
+    def bind(self, **fields: Any) -> None:
+        cur = dict(_bound_fields_var.get() or {})
         cur.update(fields)
         _bound_fields_var.set(cur)
 

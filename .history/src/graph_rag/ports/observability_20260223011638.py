@@ -37,4 +37,4 @@ class TracePort(Protocol):
         有了TracePort, Application只做
             self.trace.event(...)
         Infra层决定怎么记录。
-    '''
+'''

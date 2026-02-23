@@ -8,10 +8,10 @@ from typing import Any, Dict
 
 from graph_rag.ports.observability import TracePort
 
-_trace_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")  # contextvars保证：每个协程有自己的trace_id, 线程安全, 异步安全
+_trace_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")
 _bound_fields_var: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
     "bound_fields", default={}
-)  # 每个请求独立存系统里想追踪的上下文：比如doc_id、user_id、query、tenant等
+)
 
 
 class SimpleTrace(TracePort):
@@ -25,8 +25,8 @@ class SimpleTrace(TracePort):
     def set_trace_id(self, trace_id: str) -> None:
         _trace_id_var.set(trace_id or uuid.uuid4().hex)
 
-    def bind(self, **fields: Any) -> None:    # 绑定上下文字段, 后续所有日志都会带这个字段
-        cur = dict(_bound_fields_var.get() or {})    # ContextVar.get()取当前上下文里的值， 返回{"user_id": 123}或None， 复制一份新的dict，避免修改原对象。
+    def bind(self, **fields: Any) -> None:
+        cur = dict(_bound_fields_var.get() or {})
         cur.update(fields)
         _bound_fields_var.set(cur)
 
