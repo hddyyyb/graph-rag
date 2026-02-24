@@ -1,0 +1,20 @@
+Metadata-Version: 2.4
+Name: graph-rag
+Version: 0.1.0
+Summary: GraphRAG API
+Requires-Python: <3.11,>=3.10
+Requires-Dist: fastapi<1,>=0.110
+Requires-Dist: uvicorn<0.42,>=0.41
+Requires-Dist: pydantic<3,>=2.12
+Provides-Extra: dev
+Requires-Dist: pytest<10,>=9; extra == "dev"
+Provides-Extra: llm
+Requires-Dist: openai<3,>=2.15; extra == "llm"
+Requires-Dist: httpx<0.29,>=0.28; extra == "llm"
+Provides-Extra: ml
+Requires-Dist: numpy<2,>=1.26; extra == "ml"
+Requires-Dist: pandas<3,>=2.3; extra == "ml"
+Requires-Dist: torch<3,>=2.4; extra == "ml"
+Requires-Dist: transformers<5,>=4.44; extra == "ml"
+Requires-Dist: sentence-transformers<6,>=5.2; extra == "ml"
+Requires-Dist: faiss-cpu<2,>=1.9; extra == "ml"

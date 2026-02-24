@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graph-rag"
+version = "0.1.0"
+description = "GraphRAG API"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+  # 你 main.py 里直接 import 的运行期依赖
+  "fastapi>=0.110,<1",
+  "uvicorn>=0.41,<0.42",
+  "pydantic>=2.12,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9,<10",
+]
+
+# 如果你后续把GraphRAG接入LLM/Embedding（你环境里已有这些），可以用 extras 管理
+llm = [
+  "openai>=2.15,<3",
+  "httpx>=0.28,<0.29",
+]
+
+ml = [
+  "numpy>=1.26,<2",
+  "pandas>=2.3,<3",
+  "torch>=2.4,<3",
+  "transformers>=4.44,<5",
+  "sentence-transformers>=5.2,<6",
+  "faiss-cpu>=1.9,<2",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
