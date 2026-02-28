@@ -18,7 +18,6 @@ from graph_rag.infra.adapters import (
     InMemoryGraphStore,
     InMemoryVectorStore,
     SimpleKernel,
-    FakeEmbeddingV2,
 )
 from graph_rag.infra.config import Settings
 from graph_rag.infra.observability.logging import SimpleTrace, setup_logging
@@ -42,16 +41,11 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
     # 未来可以无缝换成Milvus/FAISS/Neo4j/PGVector/真实Embedding API等。
     vector_store = InMemoryVectorStore()
     graph_store = InMemoryGraphStore()
-    # embedder = HashEmbeddingProvider(dim=32)
-    embedder = FakeEmbeddingV2()
+    embedder = HashEmbeddingProvider(dim=32)
     kernel = SimpleKernel()
 
     # Application services  2.4 Application services：业务用例层（Ingest/Query）
     from graph_rag.application import IngestService, QueryService
-
-
-
-    '''Service-- 对应 业务流程, 代码是port(父类的东西), 它的参数是实例化的从西, infra实现的'''
 
     # 把文档/文本摄入→切块→embedding→写入vector store→抽取图→写入graph store
     ingest_service = IngestService(
@@ -73,8 +67,6 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
         graph_top_k=settings.graph_top_k,
     )
 
-    # 返回容器字典
-    # 把所有实例放入一个dict，后面放到app.state.container中供路由/中间件读取
     return {
         "settings": settings,
         "trace": trace,
@@ -87,29 +79,25 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
     }
 
 
-def create_app() -> FastAPI:    # 构建FastAPI实例并挂载所有东西
+def create_app() -> FastAPI:    # 创建FastAPI app
     app = FastAPI(title="GraphRAG", version="0.1.0")
 
     # Build DI container
-    # app.state是FastAPI提供的全局状态对象（本质上是挂在app实例上的一个容器）
-    # 把“DI容器”塞进去，就能在任意请求里通过request.app.state.container拿到服务实例
-    app.state.container = build_container()  
+    app.state.container = build_container()
 
     # Trace middleware: ensure every request has trace_id (header -> contextvar -> response header)
-    # @app.middleware("http")-装饰器:把下面这个函数注册成“HTTP请求的中间件”，以后每次有HTTP请求进来，框架都会按流程自动执行它。
     @app.middleware("http")
-    async def trace_middleware(request: Request, call_next):        # 每个请求进来设置trace_id，并写回响应header
-        trace = request.app.state.container["trace"]                # 1. 从容器取trace
-        incoming = request.headers.get("x-trace-id", "").strip()    # 2. 读请求头x-trace-id
-        trace_id = incoming or uuid.uuid4().hex                     # 3. 如果没有就生成一个uuid
-        trace.set_trace_id(trace_id)                                # 4. trace.set_trace_id(trace_id)写入上下文
+    async def trace_middleware(request: Request, call_next):  # 每个请求进来设置trace_id，并写回响应header
+        trace = request.app.state.container["trace"]
+        incoming = request.headers.get("x-trace-id", "").strip()
+        trace_id = incoming or uuid.uuid4().hex
+        trace.set_trace_id(trace_id)
 
-        response = await call_next(request)                         # 5. 调用下游（路由）
-        response.headers["x-trace-id"] = trace.get_trace_id()       # 6. 把trace_id写回响应头，便于前端/调用方串联日志
+        response = await call_next(request)
+        response.headers["x-trace-id"] = trace.get_trace_id()
         return response
 
     # Exception mapping
-    # 5）异常映射：把Domain异常变成统一HTTP响应
     @app.exception_handler(ValidationError)    # 把Domain异常映射成HTTP状态码+JSON
     async def handle_validation(_: Request, exc: ValidationError):
         return JSONResponse(status_code=400, content={"error": "validation_error", "message": str(exc)})

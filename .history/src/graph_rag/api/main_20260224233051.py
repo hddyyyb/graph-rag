@@ -18,7 +18,6 @@ from graph_rag.infra.adapters import (
     InMemoryGraphStore,
     InMemoryVectorStore,
     SimpleKernel,
-    FakeEmbeddingV2,
 )
 from graph_rag.infra.config import Settings
 from graph_rag.infra.observability.logging import SimpleTrace, setup_logging
@@ -42,16 +41,11 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
     # 未来可以无缝换成Milvus/FAISS/Neo4j/PGVector/真实Embedding API等。
     vector_store = InMemoryVectorStore()
     graph_store = InMemoryGraphStore()
-    # embedder = HashEmbeddingProvider(dim=32)
-    embedder = FakeEmbeddingV2()
+    embedder = HashEmbeddingProvider(dim=32)
     kernel = SimpleKernel()
 
     # Application services  2.4 Application services：业务用例层（Ingest/Query）
     from graph_rag.application import IngestService, QueryService
-
-
-
-    '''Service-- 对应 业务流程, 代码是port(父类的东西), 它的参数是实例化的从西, infra实现的'''
 
     # 把文档/文本摄入→切块→embedding→写入vector store→抽取图→写入graph store
     ingest_service = IngestService(
@@ -96,7 +90,6 @@ def create_app() -> FastAPI:    # 构建FastAPI实例并挂载所有东西
     app.state.container = build_container()  
 
     # Trace middleware: ensure every request has trace_id (header -> contextvar -> response header)
-    # @app.middleware("http")-装饰器:把下面这个函数注册成“HTTP请求的中间件”，以后每次有HTTP请求进来，框架都会按流程自动执行它。
     @app.middleware("http")
     async def trace_middleware(request: Request, call_next):        # 每个请求进来设置trace_id，并写回响应header
         trace = request.app.state.container["trace"]                # 1. 从容器取trace

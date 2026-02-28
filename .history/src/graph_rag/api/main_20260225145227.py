@@ -18,7 +18,6 @@ from graph_rag.infra.adapters import (
     InMemoryGraphStore,
     InMemoryVectorStore,
     SimpleKernel,
-    FakeEmbeddingV2,
 )
 from graph_rag.infra.config import Settings
 from graph_rag.infra.observability.logging import SimpleTrace, setup_logging
@@ -42,8 +41,7 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
     # 未来可以无缝换成Milvus/FAISS/Neo4j/PGVector/真实Embedding API等。
     vector_store = InMemoryVectorStore()
     graph_store = InMemoryGraphStore()
-    # embedder = HashEmbeddingProvider(dim=32)
-    embedder = FakeEmbeddingV2()
+    embedder = HashEmbeddingProvider(dim=32)
     kernel = SimpleKernel()
 
     # Application services  2.4 Application services：业务用例层（Ingest/Query）

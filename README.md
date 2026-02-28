@@ -15,6 +15,7 @@
 
 3) 启动API
 - uvicorn graph_rag.api.main:app --reload --port 8000
+if test: pytest -q
 
 4) 访问
 - http://localhost:8000/docs

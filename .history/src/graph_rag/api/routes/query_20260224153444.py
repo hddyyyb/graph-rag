@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
-# Depends = 告诉 FastAPI：这个参数不是用户传的，而是框架帮你提供
-
-
 
 from graph_rag.api.schemas.query import QueryRequest, QueryResponse
 from graph_rag.application.query_service import QueryService
@@ -39,8 +36,3 @@ def query(
         retrieval_debug=ans.retrieval_debug,
         citations=ans.citations,
     )
-
-
-'''
-
-'''
