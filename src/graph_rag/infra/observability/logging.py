@@ -7,6 +7,7 @@ import uuid
 from typing import Any, Dict
 
 from graph_rag.ports.observability import TracePort
+from graph_rag.ports.clock import ClockPort
 
 _trace_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")  # contextvars保证：每个协程有自己的trace_id, 线程安全, 异步安全
 _bound_fields_var: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
@@ -15,6 +16,10 @@ _bound_fields_var: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextV
 
 
 class SimpleTrace(TracePort):
+    def __init__(self, clock: ClockPort):
+        self.started_at = clock.now_iso()
+
+
     def get_trace_id(self) -> str:
         tid = _trace_id_var.get()
         if not tid:

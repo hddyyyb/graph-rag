@@ -19,6 +19,8 @@ from graph_rag.infra.adapters import (
     InMemoryVectorStore,
     SimpleKernel,
     FakeEmbeddingV2,
+    SystemClock,
+    FixedClock,
 )
 from graph_rag.infra.config import Settings
 from graph_rag.infra.observability.logging import SimpleTrace, setup_logging
@@ -33,7 +35,8 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
                                           # 关键点：日志初始化要尽早做，
                                           # 因为后面构造组件/处理请求都要记录日志。
 
-    trace = SimpleTrace()                 # 2.2 Trace对象：请求链路的“上下文”
+    clock = SystemClock()
+    trace = SimpleTrace(clock = clock)                 # 2.2 Trace对象：请求链路的“上下文”
 
     # Adapters (Day2 memory)    2.3 Adapters：基础设施层的实现（此处是内存版）
     # 这一层叫Adapters很典型：
@@ -77,6 +80,7 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
     # 把所有实例放入一个dict，后面放到app.state.container中供路由/中间件读取
     return {
         "settings": settings,
+        "clock": clock,
         "trace": trace,
         "vector_store": vector_store,
         "graph_store": graph_store,

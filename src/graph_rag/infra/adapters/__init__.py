@@ -3,6 +3,7 @@ from .milvus_store import InMemoryVectorStore
 from .neo4j_store import InMemoryGraphStore
 from .llamaindex_kernel import SimpleKernel
 from .fake_embedding_v2 import FakeEmbeddingV2
+from .clock import SystemClock, FixedClock
 
 __all__ = [
     "HashEmbeddingProvider",
@@ -10,6 +11,8 @@ __all__ = [
     "InMemoryGraphStore",
     "SimpleKernel",
     "FakeEmbeddingV2",
+    "SystemClock",
+    "FixedClock",
 ]
 
 
