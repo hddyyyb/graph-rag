@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from graph_rag.domain.models import RetrievedChunk
 from graph_rag.ports.vector_store import VectorStorePort
@@ -41,9 +41,17 @@ class InMemoryVectorStore(VectorStorePort):
             chunk_id = f"c{idx}"
             self._data[(doc_id, chunk_id)] = (txt, emb)
 
-    def search(self, query_embedding: List[float], top_k: int) -> List[RetrievedChunk]:
+    def search(
+            self, 
+            query_embedding: List[float], 
+            top_k: int,
+            filter_doc_id:Optional[str] = None,
+            ) -> List[RetrievedChunk]:
         scored: List[Tuple[float, Tuple[str, str], str]] = []
         for (doc_id, chunk_id), (txt, emb) in self._data.items():
+            # 如果要过滤且不等
+            if filter_doc_id is not None and doc_id != filter_doc_id:
+                continue  
             score = _cosine(query_embedding, emb)
             scored.append((score, (doc_id, chunk_id), txt))
         scored.sort(key=lambda x: x[0], reverse=True)
@@ -56,7 +64,7 @@ class InMemoryVectorStore(VectorStorePort):
                     chunk_id=chunk_id,
                     text=txt,
                     score=float(score),
-                    source="vector",
+                    source="memory",
                 )
             )
         return out

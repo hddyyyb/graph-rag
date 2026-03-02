@@ -17,6 +17,7 @@ from graph_rag.infra.adapters import (
     HashEmbeddingProvider,
     InMemoryGraphStore,
     InMemoryVectorStore,
+    SQLiteVectorStore,
     SimpleKernel,
     FakeEmbeddingV2,
     SystemClock,
@@ -29,7 +30,9 @@ from graph_rag.infra.observability.logging import SimpleTrace, setup_logging
 # api/main.py 这是FastAPI应用入口, 负责"把系统装配起来并跑起来"
 
 
-def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、stores、services等实例）
+def build_container(settings_override ={
+        "vector_store_backend": "memory"
+    }) -> Dict[str, Any]:  # 创建DI容器（settings、trace、stores、services等实例）
     settings = Settings()                 # 2.1 Settings与日志初始化, 通常是配置入口：默认值、环境变量读取（你注释里Day2/Day3暗示后续会从env加载）
     setup_logging(settings.log_level)     # 把日志系统按配置初始化
                                           # 关键点：日志初始化要尽早做，
@@ -43,7 +46,13 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
     # 让上层服务依赖抽象接口，而不是依赖具体实现。
     # 你现在用InMemory实现，
     # 未来可以无缝换成Milvus/FAISS/Neo4j/PGVector/真实Embedding API等。
-    vector_store = InMemoryVectorStore()
+
+    vector_store_backend = settings_override["vector_store_backend"]
+    if vector_store_backend == "sqlite":
+
+        vector_store = SQLiteVectorStore(settings_override["sqlite_path"])
+    else:
+        vector_store = InMemoryVectorStore()
     graph_store = InMemoryGraphStore()
     # embedder = HashEmbeddingProvider(dim=32)
     embedder = FakeEmbeddingV2()
@@ -91,13 +100,17 @@ def build_container() -> Dict[str, Any]:  # 创建DI容器（settings、trace、
     }
 
 
-def create_app() -> FastAPI:    # 构建FastAPI实例并挂载所有东西
+def create_app( settings_override ={
+        "vector_store_backend": "memory"
+    } ) -> FastAPI:    # 构建FastAPI实例并挂载所有东西
+
+
     app = FastAPI(title="GraphRAG", version="0.1.0")
 
     # Build DI container
     # app.state是FastAPI提供的全局状态对象（本质上是挂在app实例上的一个容器）
     # 把“DI容器”塞进去，就能在任意请求里通过request.app.state.container拿到服务实例
-    app.state.container = build_container()  
+    app.state.container = build_container(settings_override)  
 
     # Trace middleware: ensure every request has trace_id (header -> contextvar -> response header)
     # @app.middleware("http")-装饰器:把下面这个函数注册成“HTTP请求的中间件”，以后每次有HTTP请求进来，框架都会按流程自动执行它。

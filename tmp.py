@@ -1,5 +1,12 @@
 import numpy as np
-a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
-# 获取第二列数据
-col_2 = a[1:2,1:2]
-print(col_2)
+
+
+import sys
+
+n = int(sys.stdin.readline())
+res = []
+for i in range(n):
+    row = list(map(int,sys.stdin.readline().split()))
+    res.append(row)
+
+print(res)

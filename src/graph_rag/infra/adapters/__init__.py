@@ -4,6 +4,7 @@ from .neo4j_store import InMemoryGraphStore
 from .llamaindex_kernel import SimpleKernel
 from .fake_embedding_v2 import FakeEmbeddingV2
 from .clock import SystemClock, FixedClock
+from .sqlite_vector_store import SQLiteVectorStore
 
 __all__ = [
     "HashEmbeddingProvider",
@@ -13,6 +14,7 @@ __all__ = [
     "FakeEmbeddingV2",
     "SystemClock",
     "FixedClock",
+    "SQLiteVectorStore",
 ]
 
 
