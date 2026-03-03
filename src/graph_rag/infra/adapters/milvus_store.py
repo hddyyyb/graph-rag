@@ -46,14 +46,21 @@ class InMemoryVectorStore(VectorStorePort):
             query_embedding: List[float], 
             top_k: int,
             filter_doc_id:Optional[str] = None,
+            min_score: Optional[float] = None,
             ) -> List[RetrievedChunk]:
         scored: List[Tuple[float, Tuple[str, str], str]] = []
+
+        # 这里是取所有 chunk 全部做匹配
         for (doc_id, chunk_id), (txt, emb) in self._data.items():
-            # 如果要过滤且不等
-            if filter_doc_id is not None and doc_id != filter_doc_id:
+            
+            if filter_doc_id is not None and doc_id != filter_doc_id:# 如果要过滤doc_id且不等
                 continue  
             score = _cosine(query_embedding, emb)
+            if min_score is not None and min_score >score:
+                continue
             scored.append((score, (doc_id, chunk_id), txt))
+        
+        # 按照 score 排序
         scored.sort(key=lambda x: x[0], reverse=True)
 
         out: List[RetrievedChunk] = []

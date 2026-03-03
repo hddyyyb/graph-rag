@@ -49,11 +49,13 @@ class SQLiteVectorStore:
 
 
    
-    def search(self, 
-               query_embedding: List[float], 
-               top_k: int,
-               filter_doc_id: Optional[str] = None,
-               ) -> List[RetrievedChunk]:
+    def search(
+            self,
+            query_embedding: List[float],
+            top_k: int,
+            filter_doc_id: Optional[str] = None,
+            min_score: Optional[float] = None,
+            ) -> List[RetrievedChunk]:
         # TODO 1: 边界  
         if top_k <= 0:
             return []
@@ -76,6 +78,8 @@ class SQLiteVectorStore:
         for doc_id, chunk_id, text, emb_json in rows:
             emb = json.loads(emb_json)
             score = self._cosine(query_embedding, emb)
+            if min_score is not None and min_score >score:
+                continue
             scored.append(RetrievedChunk(
                 doc_id=doc_id,
                 chunk_id=chunk_id,

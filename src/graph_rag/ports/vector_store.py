@@ -11,13 +11,19 @@ from graph_rag.domain.models import RetrievedChunk
 # Infra层必须把底层数据转换成Domain对象再返回。
 
 class VectorStorePort(Protocol):
-    def upsert(self, doc_id: str, chunks: List[str], embeddings: List[List[float]]) -> None:
+    def upsert(
+            self, 
+            doc_id: str, 
+            chunks: List[str], 
+            embeddings: List[List[float]]
+            ) -> None:
         ...
 
     def search(
-        self, 
-        query_embedding: List[float],
-        top_k: int,
-        filter_doc_id: Optional[str] = None,
+            self,
+            query_embedding: List[float],
+            top_k: int,
+            filter_doc_id: Optional[str] = None,
+            min_score: Optional[float] = None,
     ) -> List[RetrievedChunk]:
         ...
