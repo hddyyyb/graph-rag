@@ -1,5 +1,6 @@
 from graph_rag.infra.adapters import InMemoryVectorStore
 from graph_rag.infra.adapters import SQLiteVectorStore
+from graph_rag.ports.vector_store import SearchOptions
 
 
 def test_inmemory_search_filter_doc_id():
@@ -19,6 +20,21 @@ def test_inmemory_search_filter_doc_id():
     assert len(hits_doc2) > 0
     assert all(h.doc_id == "doc2" for h in hits_doc2)
 
+    hits_doc1_opt = store.search([1.0, 0.0], top_k=10, options=SearchOptions(filter_doc_id="doc1"))
+    assert all(ho.doc_id == "doc1" for ho in hits_doc1_opt)
+
+    hits_doc2_opt = store.search([1.0, 0.0], top_k=10, options=SearchOptions(min_score=0.8))
+    assert all(h.score >= 0.8 for h in hits_doc2_opt)
+    hits = store.search(
+        [1.0, 0.0],
+        top_k=10,
+        min_score=0.0,  # 旧参数
+        options=SearchOptions(min_score=1.1),  # options里故意设很高
+    )
+    assert len(hits) > 0
+    assert all(h.score >= 0.0 for h in hits)
+
+
 def test_sqlite_search_filter_doc_id(tmp_path):
     db_path = str(tmp_path / "day5.db")
     store = SQLiteVectorStore(db_path)
@@ -33,7 +49,19 @@ def test_sqlite_search_filter_doc_id(tmp_path):
     hits_doc2 = store.search([1.0, 0.0], top_k=10, filter_doc_id="doc2")
     assert len(hits_doc2) > 0
     assert all(h.doc_id == "doc2" for h in hits_doc2)
-
+    hits_doc1_opt = store.search([1.0, 0.0], top_k=10, options=SearchOptions(filter_doc_id="doc1"))
+    assert all(ho.doc_id == "doc1" for ho in hits_doc1_opt)
+        
+    hits_doc2_opt = store.search([1.0, 0.0], top_k=10, options=SearchOptions(min_score=0.8))
+    assert all(h.score >= 0.8 for h in hits_doc2_opt)
+    hits = store.search(
+        [1.0, 0.0],
+        top_k=10,
+        min_score=0.0,  # 旧参数
+        options=SearchOptions(min_score=1.1),  # options里故意设很高
+    )
+    assert len(hits) > 0
+    assert all(h.score >= 0.0 for h in hits)
 
 
 def test_inmemory_search_filter_min_score():
@@ -84,3 +112,77 @@ def test_sqlite_search_filter_min_score(tmp_path):
 
     hits_min_11 = store.search([1.0, 0.0], top_k=10, min_score=1.1)
     assert hits_min_11 == []
+
+
+def test_inmemory_search_filter_doc_id_with_options():
+    store = InMemoryVectorStore()
+    store.upsert("doc1", ["a", "b"], [[1.0, 0.0], [0.8, 0.2]])
+    store.upsert("doc2", ["c", "d"], [[0.0, 1.0], [0.2, 0.8]])
+
+    hits_doc1_opt = store.search([1.0, 0.0], top_k=10, options=SearchOptions(filter_doc_id="doc1"))
+    assert len(hits_doc1_opt) > 0
+    assert all(h.doc_id == "doc1" for h in hits_doc1_opt)
+
+
+def test_sqlite_search_filter_doc_id_with_options(tmp_path):
+    db_path = str(tmp_path / "day7_docid.db")
+    store = SQLiteVectorStore(db_path)
+
+    store.upsert("doc1", ["a", "b"], [[1.0, 0.0], [0.8, 0.2]])
+    store.upsert("doc2", ["c", "d"], [[0.0, 1.0], [0.2, 0.8]])
+
+    hits_doc1_opt = store.search([1.0, 0.0], top_k=10, options=SearchOptions(filter_doc_id="doc1"))
+    assert len(hits_doc1_opt) > 0
+    assert all(h.doc_id == "doc1" for h in hits_doc1_opt)
+
+
+def test_inmemory_search_filter_min_score_with_options():
+    store = InMemoryVectorStore()
+    store.upsert("doc1", ["a", "b"], [[1.0, 0.0], [0.8, 0.2]])
+    store.upsert("doc2", ["c", "d"], [[0.0, 1.0], [0.2, 0.8]])
+
+    hits = store.search([1.0, 0.0], top_k=10, options=SearchOptions(min_score=0.8))
+    assert len(hits) > 0
+    assert all(h.score >= 0.8 for h in hits)
+
+
+def test_sqlite_search_filter_min_score_with_options(tmp_path):
+    db_path = str(tmp_path / "day7_minscore.db")
+    store = SQLiteVectorStore(db_path)
+
+    store.upsert("doc1", ["a", "b"], [[1.0, 0.0], [0.8, 0.2]])
+    store.upsert("doc2", ["c", "d"], [[0.0, 1.0], [0.2, 0.8]])
+
+    hits = store.search([1.0, 0.0], top_k=10, options=SearchOptions(min_score=0.8))
+    assert len(hits) > 0
+    assert all(h.score >= 0.8 for h in hits)
+
+
+def test_inmemory_search_precedence_legacy_over_options():
+    store = InMemoryVectorStore()
+    store.upsert("doc1", ["a", "b"], [[1.0, 0.0], [0.8, 0.2]])
+    store.upsert("doc2", ["c", "d"], [[0.0, 1.0], [0.2, 0.8]])
+
+    hits = store.search(
+        [1.0, 0.0],
+        top_k=10,
+        min_score=0.0,  # 旧参数优先
+        options=SearchOptions(min_score=1.1),
+    )
+    assert len(hits) > 0
+
+
+def test_sqlite_search_precedence_legacy_over_options(tmp_path):
+    db_path = str(tmp_path / "day7_precedence.db")
+    store = SQLiteVectorStore(db_path)
+
+    store.upsert("doc1", ["a", "b"], [[1.0, 0.0], [0.8, 0.2]])
+    store.upsert("doc2", ["c", "d"], [[0.0, 1.0], [0.2, 0.8]])
+
+    hits = store.search(
+        [1.0, 0.0],
+        top_k=10,
+        min_score=0.0,
+        options=SearchOptions(min_score=1.1),
+    )
+    assert len(hits) > 0

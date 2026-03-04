@@ -4,7 +4,8 @@ import math
 from typing import Dict, List, Tuple, Optional
 
 from graph_rag.domain.models import RetrievedChunk
-from graph_rag.ports.vector_store import VectorStorePort
+
+from graph_rag.ports.vector_store import VectorStorePort, SearchOptions, normalize_search_options
 
 
 '''
@@ -45,18 +46,25 @@ class InMemoryVectorStore(VectorStorePort):
             self, 
             query_embedding: List[float], 
             top_k: int,
+            options: Optional[SearchOptions] = None,
             filter_doc_id:Optional[str] = None,
             min_score: Optional[float] = None,
             ) -> List[RetrievedChunk]:
+        
+        opts = normalize_search_options(
+            options = options, 
+            filter_doc_id = filter_doc_id,
+            min_score = min_score,
+            )
         scored: List[Tuple[float, Tuple[str, str], str]] = []
 
         # 这里是取所有 chunk 全部做匹配
         for (doc_id, chunk_id), (txt, emb) in self._data.items():
             
-            if filter_doc_id is not None and doc_id != filter_doc_id:# 如果要过滤doc_id且不等
+            if opts.filter_doc_id is not None and doc_id != opts.filter_doc_id:# 如果要过滤doc_id且不等
                 continue  
             score = _cosine(query_embedding, emb)
-            if min_score is not None and min_score >score:
+            if opts.min_score is not None and score < opts.min_score:
                 continue
             scored.append((score, (doc_id, chunk_id), txt))
         

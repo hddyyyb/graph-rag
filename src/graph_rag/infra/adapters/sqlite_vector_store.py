@@ -8,6 +8,8 @@ from typing import List, Optional
 from graph_rag.domain.models import RetrievedChunk
 import math
 
+from graph_rag.ports.vector_store import SearchOptions, normalize_search_options
+
 
 class SQLiteVectorStore:
     def __init__(self, db_path: str):
@@ -53,23 +55,30 @@ class SQLiteVectorStore:
             self,
             query_embedding: List[float],
             top_k: int,
+            options: Optional[SearchOptions] = None,
             filter_doc_id: Optional[str] = None,
             min_score: Optional[float] = None,
             ) -> List[RetrievedChunk]:
+        
+        opts = normalize_search_options(
+            options = options, 
+            filter_doc_id = filter_doc_id,
+            min_score = min_score,
+            )
         # TODO 1: 边界  
         if top_k <= 0:
             return []
 
         # TODO 2: 取数据
 
-        if filter_doc_id is None:
+        if opts.filter_doc_id is None:
             cur = self._conn.execute(
                 "SELECT doc_id, chunk_id, text, embedding FROM chunks"
                 )
         else:
             cur = self._conn.execute(
                 "SELECT doc_id, chunk_id, text, embedding FROM chunks WHERE doc_id = ?",
-                (filter_doc_id,),
+                (opts.filter_doc_id,),
             )
         rows = cur.fetchall()
 
@@ -78,7 +87,7 @@ class SQLiteVectorStore:
         for doc_id, chunk_id, text, emb_json in rows:
             emb = json.loads(emb_json)
             score = self._cosine(query_embedding, emb)
-            if min_score is not None and min_score >score:
+            if opts.min_score is not None and score < opts.min_score:
                 continue
             scored.append(RetrievedChunk(
                 doc_id=doc_id,
