@@ -19,12 +19,17 @@ from graph_rag.infra.adapters import (
     InMemoryVectorStore,
     SQLiteVectorStore,
     SimpleKernel,
+    SimpleRAGKernel,
     FakeEmbeddingV2,
     SystemClock,
     FixedClock,
+    FakeLLM,
+    LocalLLM,
 )
 from graph_rag.infra.config import Settings
 from graph_rag.infra.observability.logging import SimpleTrace, setup_logging
+
+
 
 
 # api/main.py 这是FastAPI应用入口, 负责"把系统装配起来并跑起来"
@@ -34,29 +39,53 @@ def build_container(settings_override ={
         "vector_store_backend": "memory"
     }) -> Dict[str, Any]:  # 创建DI容器（settings、trace、stores、services等实例）
     settings = Settings()                 # 2.1 Settings与日志初始化, 通常是配置入口：默认值、环境变量读取（你注释里Day2/Day3暗示后续会从env加载）
-    setup_logging(settings.log_level)     # 把日志系统按配置初始化
-                                          # 关键点：日志初始化要尽早做，
-                                          # 因为后面构造组件/处理请求都要记录日志。
+    setup_logging(settings.log_level)     # 把日志系统按配置初始化, 日志初始化要尽早做, 因为后面构造组件/处理请求都要记录日志。
 
     clock = SystemClock()
     trace = SimpleTrace(clock = clock)                 # 2.2 Trace对象：请求链路的“上下文”
 
-    # Adapters (Day2 memory)    2.3 Adapters：基础设施层的实现（此处是内存版）
-    # 这一层叫Adapters很典型：
+
+
+    llm_backend = (settings_override or {}).get("llm_backend", "fake")
+    if llm_backend == "fake":
+        llm = FakeLLM()
+    elif llm_backend == "local":
+        llm = LocalLLM(
+            base_url=(settings_override or {}).get("local_llm_base_url", "http://localhost:11434"),
+            model=(settings_override or {}).get("local_llm_model", "llama3"),
+        )
+    elif llm_backend == "openai":
+        from graph_rag.infra.adapters import OpenAILLM
+        llm = OpenAILLM(
+            api_key=(settings_override or {}).get("openai_api_key"),
+            model=(settings_override or {}).get("openai_model", "gpt-5"),
+            instructions=(settings_override or {}).get(
+                "openai_instructions",
+                "You are a helpful assistant.",
+            ),
+        )
+    else:
+        raise ValueError(f"unknown llm_backend: {llm_backend}")
+
+    # Adapters：基础设施层的实现（此处是内存版）
     # 让上层服务依赖抽象接口，而不是依赖具体实现。
-    # 你现在用InMemory实现，
-    # 未来可以无缝换成Milvus/FAISS/Neo4j/PGVector/真实Embedding API等。
+    # InMemory-> Milvus/FAISS/Neo4j/PGVector/真实Embedding API等。
 
-    vector_store_backend = settings_override["vector_store_backend"]
+    vector_store_backend = (settings_override or {}).get("vector_store_backend", "memory")
+
     if vector_store_backend == "sqlite":
-
-        vector_store = SQLiteVectorStore(settings_override["sqlite_path"])
+        sqlite_path = (settings_override or {}).get("sqlite_path")
+        if not sqlite_path:
+            raise ValueError("sqlite backend requires sqlite_path")
+        vector_store = SQLiteVectorStore(sqlite_path)
     else:
         vector_store = InMemoryVectorStore()
     graph_store = InMemoryGraphStore()
     # embedder = HashEmbeddingProvider(dim=32)
     embedder = FakeEmbeddingV2()
-    kernel = SimpleKernel()
+    
+    #kernel = SimpleKernel()
+    kernel = SimpleRAGKernel(llm=llm)
 
     # Application services  2.4 Application services：业务用例层（Ingest/Query）
     from graph_rag.application import IngestService, QueryService
@@ -94,9 +123,10 @@ def build_container(settings_override ={
         "vector_store": vector_store,
         "graph_store": graph_store,
         "embedder": embedder,
-        "kernel": kernel,
         "ingest_service": ingest_service,
         "query_service": query_service,
+        "llm": llm,
+        "kernel": kernel,
     }
 
 

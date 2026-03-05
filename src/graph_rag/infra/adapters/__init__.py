@@ -6,15 +6,25 @@ from .fake_embedding_v2 import FakeEmbeddingV2
 from .clock import SystemClock, FixedClock
 from .sqlite_vector_store import SQLiteVectorStore
 
+from .fake_llm import FakeLLM
+from .simple_rag_kernel import SimpleRAGKernel
+from .local_llm import LocalLLM
+from .openai_llm import OpenAILLM
+
+
 __all__ = [
     "HashEmbeddingProvider",
     "InMemoryVectorStore",
     "InMemoryGraphStore",
-    "SimpleKernel",
     "FakeEmbeddingV2",
     "SystemClock",
     "FixedClock",
-    "SQLiteVectorStore",
+    "SQLiteVectorStore", 
+    "SimpleKernel",
+    "SimpleRAGKernel",
+    "FakeLLM",
+    "LocalLLM",
+    "OpenAILLM",
 ]
 
 
