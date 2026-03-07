@@ -25,9 +25,11 @@ from graph_rag.infra.adapters import (
     FixedClock,
     FakeLLM,
     LocalLLM,
+    DefaultRetrievalPostProcessor,
 )
 from graph_rag.infra.config import Settings
 from graph_rag.infra.observability.logging import SimpleTrace, setup_logging
+
 
 
 
@@ -44,7 +46,7 @@ def build_container(settings_override ={
     clock = SystemClock()
     trace = SimpleTrace(clock = clock)                 # 2.2 Trace对象：请求链路的“上下文”
 
-
+    post_processor = DefaultRetrievalPostProcessor()
 
     llm_backend = (settings_override or {}).get("llm_backend", "fake")
     if llm_backend == "fake":
@@ -110,6 +112,7 @@ def build_container(settings_override ={
         embedder=embedder,
         kernel=kernel,
         trace=trace,
+        post_processor = post_processor, 
         vector_top_k=settings.vector_top_k,
         graph_top_k=settings.graph_top_k,
     )

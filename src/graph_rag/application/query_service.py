@@ -9,23 +9,12 @@ from graph_rag.ports.graph_store import GraphStorePort
 from graph_rag.ports.kernel import RAGKernelPort
 from graph_rag.ports.observability import TracePort
 from graph_rag.ports.vector_store import VectorStorePort
-
+from graph_rag.ports.retrieval_post_processor import RetrievalPostProcessorPort
 
 # 负责“查询流程”的业务编排
 # 这是GraphRAG系统最核心的Service
 
-def _merge_dedup(chunks: List[RetrievedChunk]) -> List[RetrievedChunk]:
-    seen = set()
-    out: List[RetrievedChunk] = []
-    for c in chunks:
-        key = (c.doc_id, c.chunk_id, c.source)
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(c)
-    # Keep best first by score
-    out.sort(key=lambda x: x.score, reverse=True)
-    return out
+
 
 
 class QueryService:
@@ -36,6 +25,7 @@ class QueryService:
         embedder: EmbeddingProviderPort,
         kernel: RAGKernelPort,
         trace: TracePort,
+        post_processor: RetrievalPostProcessorPort,
         *,
         vector_top_k: int = 5,
         graph_top_k: int = 5,
@@ -45,6 +35,7 @@ class QueryService:
         self.embedder = embedder
         self.kernel = kernel
         self.trace = trace
+        self.post_processor = post_processor 
         self.vector_top_k = vector_top_k
         self.graph_top_k = graph_top_k
 
@@ -77,8 +68,15 @@ class QueryService:
         if enable_graph:         # 4. 如果enable_graph, 调用graph_store.search()
             graph_hits = self.graph_store.search(q, top_k or self.graph_top_k)
 
-        merged = _merge_dedup(vector_hits + graph_hits)    # 5. 合并去重(_merge_dedup)
+
+        processed = self.post_processor.process(
+            vector_hits + graph_hits,
+            top_k or self.vector_top_k,
+        )
+        merged = processed.chunks
         answer_text = self.kernel.generate_answer(q, merged)    # 6. 调用Kernel生成answer
+
+
         
         # 7. 构建Answer对象 (包含retrieval_debug)
         retrieval_debug: Dict[str, Any] = {
@@ -117,15 +115,10 @@ class QueryService:
             merged=len(merged),
         )
 
-        # citations optional for Day2
-        citations = [
-            {"doc_id": c.doc_id, "chunk_id": c.chunk_id, "source": c.source, "score": c.score}
-            for c in merged[:3]
-        ] if merged else []
 
         return Answer(
             answer=answer_text,
             trace_id=trace_id,
             retrieval_debug=retrieval_debug,
-            citations=citations,
+            citations=processed.citations,
         )

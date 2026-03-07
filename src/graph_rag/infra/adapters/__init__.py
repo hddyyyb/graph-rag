@@ -11,6 +11,8 @@ from .simple_rag_kernel import SimpleRAGKernel
 from .local_llm import LocalLLM
 from .openai_llm import OpenAILLM
 
+from .retrieval_post_processor import DefaultRetrievalPostProcessor
+
 
 __all__ = [
     "HashEmbeddingProvider",
@@ -25,6 +27,7 @@ __all__ = [
     "FakeLLM",
     "LocalLLM",
     "OpenAILLM",
+    "DefaultRetrievalPostProcessor",
 ]
 
 
