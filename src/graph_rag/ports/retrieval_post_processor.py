@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Protocol, List
+from typing import Protocol, List, Optional
 
 from graph_rag.domain.models import RetrievedChunk
 from graph_rag.ports.postprocess_models import ProcessedResults
 
 
 class RetrievalPostProcessorPort(Protocol):
-    def process(self, chunks: List[RetrievedChunk], top_k: int) -> ProcessedResults:
+    def process(self, chunks: List[RetrievedChunk], top_k: int, min_score: Optional[float]= None) -> ProcessedResults:
         ...
 
 

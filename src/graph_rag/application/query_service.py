@@ -46,6 +46,7 @@ class QueryService:
         top_k: Optional[int] = None,
         enable_graph: bool = True,
         enable_vector: bool = True,
+        min_score: Optional[float] = 0,
     ) -> Answer:
         q = (query or "").strip()
         if not q:
@@ -72,6 +73,7 @@ class QueryService:
         processed = self.post_processor.process(
             vector_hits + graph_hits,
             top_k or self.vector_top_k,
+            min_score,
         )
         merged = processed.chunks
         answer_text = self.kernel.generate_answer(q, merged)    # 6. 调用Kernel生成answer

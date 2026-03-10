@@ -72,3 +72,47 @@ def test_process_applies_top_k_after_sort_and_dedup():
     assert len(res.citations) == 2
     citation_keys = [(c["doc_id"], c["chunk_id"]) for c  in res.citations]
     assert citation_keys == [("doc_1", "chunk_1"), ("doc_2", "chunk_2")]                   
+
+
+
+def test_min_score():
+    duplicate_low = RetrievedChunk(doc_id = "doc_1", chunk_id = "chunk_1", source = "vector", score = 0.95, text = 'text 01')
+    normal_chunk_1 = RetrievedChunk(doc_id = "doc_2", chunk_id = "chunk_1", source = "vector", score = 0.80, text = 'text 02')
+    duplicate_high = RetrievedChunk(doc_id = "doc_3", chunk_id = "chunk_1", source = "vector", score = 0.60, text = 'text 03')
+    normal_chunk_2 = RetrievedChunk(doc_id = "doc_4", chunk_id = "chunk_1", source = "vector", score = 0.40, text = 'text 04')
+    
+    processor = DefaultRetrievalPostProcessor()
+    res = processor.process([duplicate_low, normal_chunk_1, duplicate_high, normal_chunk_2], 4, min_score=0.70)
+
+    score = [c.score for c in res.chunks]
+    assert len(score) == 2
+    assert score[0] >= 0.70 and score[1] >= 0.70
+    assert len(res.citations) == 2 
+
+
+def test_min_score1():
+    duplicate_low = RetrievedChunk(doc_id = "doc_1", chunk_id = "chunk_1", source = "vector", score = 0.95, text = 'text 01')
+    normal_chunk_1 = RetrievedChunk(doc_id = "doc_2", chunk_id = "chunk_1", source = "vector", score = 0.80, text = 'text 02')
+    duplicate_high = RetrievedChunk(doc_id = "doc_3", chunk_id = "chunk_1", source = "vector", score = 0.60, text = 'text 03')
+    normal_chunk_2 = RetrievedChunk(doc_id = "doc_4", chunk_id = "chunk_1", source = "vector", score = 0.40, text = 'text 04')
+    
+    processor = DefaultRetrievalPostProcessor()
+    res = processor.process([duplicate_low, normal_chunk_1, duplicate_high, normal_chunk_2], 4, min_score=None)
+
+    score = [c.score for c in res.chunks]
+    assert len(score) == 4
+    assert len(res.citations) == 4
+
+
+def test_min_score2():
+    duplicate_low = RetrievedChunk(doc_id = "doc_1", chunk_id = "chunk_1", source = "vector", score = 0.90, text = 'text 01')
+    normal_chunk_1 = RetrievedChunk(doc_id = "doc_2", chunk_id = "chunk_1", source = "vector", score = 0.70, text = 'text 02')
+    duplicate_high = RetrievedChunk(doc_id = "doc_3", chunk_id = "chunk_1", source = "vector", score = 0.69, text = 'text 03')
+    
+    processor = DefaultRetrievalPostProcessor()
+    res = processor.process([duplicate_low, normal_chunk_1, duplicate_high], 3, min_score=0.70)
+
+    score = [c.score for c in res.chunks]
+    assert len(score) == 2
+    assert score[0] >= 0.70 and score[1] >= 0.70
+    assert len(res.citations) == 2
