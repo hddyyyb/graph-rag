@@ -15,8 +15,6 @@ from graph_rag.ports.retrieval_post_processor import RetrievalPostProcessorPort
 # 这是GraphRAG系统最核心的Service
 
 
-
-
 class QueryService:
     def __init__(
         self,
@@ -50,50 +48,55 @@ class QueryService:
     ) -> Answer:
         q = (query or "").strip()
         if not q:
-            raise ValidationError("query不能为空")    # 1. 校验query
+            raise ValidationError("Query must not be empty")
 
-        self.trace.bind(query=q)    # 2.记录trace
+        self.trace.bind(query=q)    # 记录trace
         self.trace.event(
             "query_start",
             enable_vector=enable_vector,
             enable_graph=enable_graph,
         )
 
-        vector_hits: List[RetrievedChunk] = []
-        graph_hits: List[RetrievedChunk] = []
+        vector_k = top_k or self.vector_top_k
+        graph_k = top_k or self.graph_top_k
+        final_top_k = top_k or self.vector_top_k
 
-        if enable_vector:        # 3. 如果enable_vector, 生成query embedding, 调用vector_store.search()
+
+        vector_chunks: List[RetrievedChunk] = []
+        graph_chunks: List[RetrievedChunk] = []
+
+        if enable_vector:
             qemb = self.embedder.embed_query(q)
-            vector_hits = self.vector_store.search(qemb, top_k or self.vector_top_k)
+            vector_chunks = self.vector_store.search(qemb, vector_k)
 
-        if enable_graph:         # 4. 如果enable_graph, 调用graph_store.search()
-            graph_hits = self.graph_store.search(q, top_k or self.graph_top_k)
+        if enable_graph:
+            graph_chunks = self.graph_store.search(q, graph_k)
 
+        all_chunks = vector_chunks + graph_chunks
 
         processed = self.post_processor.process(
-            vector_hits + graph_hits,
-            top_k or self.vector_top_k,
+            all_chunks,
+            final_top_k,
             min_score,
         )
+
         merged = processed.chunks
-        answer_text = self.kernel.generate_answer(q, merged)    # 6. 调用Kernel生成answer
+        answer_text = self.kernel.generate_answer(q, merged)    # 调用Kernel生成answer
 
-
-        
-        # 7. 构建Answer对象 (包含retrieval_debug)
+        # 构建Answer对象 (包含retrieval_debug)
         retrieval_debug: Dict[str, Any] = {
             "vector": {
                 "top_k": top_k or self.vector_top_k,
                 "hits": [
                     {"doc_id": c.doc_id, "chunk_id": c.chunk_id, "score": c.score}
-                    for c in vector_hits
+                    for c in vector_chunks
                 ],
             },
             "graph": {
                 "top_k": top_k or self.graph_top_k,
                 "hits": [
                     {"doc_id": c.doc_id, "chunk_id": c.chunk_id, "score": c.score}
-                    for c in graph_hits
+                    for c in graph_chunks
                 ],
             },
             "merged": {
@@ -116,7 +119,6 @@ class QueryService:
             trace_id=trace_id,
             merged=len(merged),
         )
-
 
         return Answer(
             answer=answer_text,

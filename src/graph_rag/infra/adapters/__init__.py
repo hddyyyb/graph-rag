@@ -2,12 +2,14 @@ from .embedding_provider import HashEmbeddingProvider
 from .milvus_store import InMemoryVectorStore
 from .neo4j_store import InMemoryGraphStore
 from .llamaindex_kernel import SimpleKernel
+from .simple_rag_kernel import SimpleRAGKernel
+from .fake_kernel import FakeKernel
+
 from .fake_embedding_v2 import FakeEmbeddingV2
 from .clock import SystemClock, FixedClock
 from .sqlite_vector_store import SQLiteVectorStore
 
 from .fake_llm import FakeLLM
-from .simple_rag_kernel import SimpleRAGKernel
 from .local_llm import LocalLLM
 from .openai_llm import OpenAILLM
 
@@ -28,6 +30,7 @@ __all__ = [
     "LocalLLM",
     "OpenAILLM",
     "DefaultRetrievalPostProcessor",
+    "FakeKernel",
 ]
 
 
