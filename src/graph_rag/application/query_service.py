@@ -14,7 +14,7 @@ from graph_rag.ports.retrieval_post_processor import RetrievalPostProcessorPort
 
 from .query_option import QueryOptions, normalize_query_options
 
-
+import time
 
 
 
@@ -56,6 +56,7 @@ class QueryService:
         return vector_k, graph_k, final_top_k
     
 
+
     def _retrieve_chunks(
         self,
         *,
@@ -64,33 +65,58 @@ class QueryService:
         opts: QueryOptions,
         vector_k: int,
         graph_k: int,
-    ) -> tuple[List[RetrievedChunk], List[RetrievedChunk], List[RetrievedChunk]]:
-
+    ) -> tuple[
+        List[RetrievedChunk], 
+        List[RetrievedChunk], 
+        List[RetrievedChunk], 
+        Dict[str, float],
+        ]:
 
         chunks: List[RetrievedChunk] = []
         vector_chunks: List[RetrievedChunk] = []
         graph_chunks: List[RetrievedChunk] = []
 
-        
+        timings: Dict[str, float] = {
+            "vector_retrieval_time": 0.0,
+            "graph_retrieval_time": 0.0,
+        }
+
+        # vector_retrieval
         if opts.enable_vector:
+            start = time.perf_counter()
             vector_chunks = self.vector_store.search(
                 query_embedding = qemb, 
                 top_k = vector_k
                 )
+            timings["vector_retrieval_time"] = time.perf_counter() - start
             chunks.extend(vector_chunks)
             self.trace.event("vector_retrieved", count = len(vector_chunks))
+            self.trace.event(
+                "retrieval_timing",
+                metric="vector_retrieval_time", 
+                elapsed=timings["vector_retrieval_time"],
+                )
 
-
+        # graph_retrieval
         if opts.enable_graph:
+            start = time.perf_counter()
             graph_chunks = self.graph_store.search(
                 query = q, 
                 top_k = graph_k
                 )
+            timings["graph_retrieval_time"] = time.perf_counter() - start
             chunks.extend(graph_chunks)
             self.trace.event("graph_retrieved", count = len(graph_chunks))
+            self.trace.event(
+                "retrieval_timing", 
+                metric="graph_retrieval_time", 
+                elapsed=timings["graph_retrieval_time"],
+                )
 
-        return chunks, vector_chunks, graph_chunks
-    
+
+        return chunks, vector_chunks, graph_chunks, timings
+
+
     def _build_retrieval_debug(
         self,
         *,
@@ -99,6 +125,7 @@ class QueryService:
         vector_chunks: List[RetrievedChunk],
         graph_chunks: List[RetrievedChunk],
         merged: List[RetrievedChunk],
+        timings: Dict[str, float],
     ) -> Dict[str, Any]:
         
         retrieval_debug: Dict[str, Any] = {
@@ -128,6 +155,7 @@ class QueryService:
                     for c in merged[:10]
                 ],
             },
+            "timings": timings,
         }
         return retrieval_debug
 
@@ -142,7 +170,7 @@ class QueryService:
         enable_vector: Optional[bool] = None,
     ) -> Answer:
         
-        # query 第1段：参数归一化
+        # normalize query parameters
         opts = normalize_query_options(
             options = options,
             top_k = top_k,
@@ -151,14 +179,19 @@ class QueryService:
             enable_vector = enable_vector,
         )
 
-        # query 第2段：输入校验
-        q = self._validate_query(query)
+        q = self._validate_query(query)    # validate input query
+        vector_k, graph_k, final_top_k = self._resolve_top_k_values(opts)    # prepare retrieval parameters
 
-        # query 第3段：检索参数准备
-        vector_k, graph_k, final_top_k = self._resolve_top_k_values(opts)
+        timings: Dict[str, float] = {
+            "embedding_time": 0.0,
+            "vector_retrieval_time": 0.0,
+            "graph_retrieval_time": 0.0,
+            "postprocess_time": 0.0,
+            "llm_generation_time": 0.0,
+        }
 
-        # query 第4段：trace开始 + embedding
-        self.trace.bind(query=q)    # 记录trace
+        # start trace + compute embedding
+        self.trace.bind(query=q)    # attach query to trace context
         self.trace.event(
             "query_start",
             enable_vector = opts.enable_vector,
@@ -169,40 +202,66 @@ class QueryService:
             graph_k=graph_k,
             final_top_k=final_top_k,
         )
-
+        
+        # embedding_time
+        start = time.perf_counter()
         qemb = self.embedder.embed_query(q)
+        timings["embedding_time"] = time.perf_counter() - start
+        self.trace.event(
+            "retrieval_timing", 
+            metric="embedding_time", 
+            elapsed=timings["embedding_time"],
+            )
 
 
-        # query 第5段：执行检索
-        chunks, vector_chunks, graph_chunks = self._retrieve_chunks(
+        # perform retrieval
+        chunks, vector_chunks, graph_chunks, retrieval_timings  = self._retrieve_chunks(
             q = q,
             qemb = qemb,
             opts = opts,
             vector_k = vector_k,
             graph_k = graph_k,
         )
-
-        # query 第6段：后处理 + 生成答案
+        timings.update(retrieval_timings)
+        
+        # post-processing & postprocess_time
+        start = time.perf_counter()
         processed = self.post_processor.process(
             chunks= chunks,
             top_k = final_top_k,
             min_score = opts.min_score,
         )
-
+        timings["postprocess_time"] = time.perf_counter() - start
+        self.trace.event(
+            "retrieval_timing",
+            metric="postprocess_time",
+            elapsed=timings["postprocess_time"],
+        )
+        
         merged = processed.chunks
-        answer_text = self.kernel.generate_answer(query = q, contexts =  merged)    # 调用Kernel生成answer
 
-        # query 第7段：构建 debug + 收尾返回
+        # llm_generation_time
+        start = time.perf_counter()
+        answer_text = self.kernel.generate_answer(query = q, contexts =  merged)    # 调用Kernel生成answer
+        timings["llm_generation_time"] = time.perf_counter() - start
+        self.trace.event(
+            "retrieval_timing",
+            metric="llm_generation_time",
+            elapsed=timings["llm_generation_time"],
+        )
+
+        # build debug info + finalize response
         retrieval_debug = self._build_retrieval_debug(
             vector_k = vector_k,
             graph_k = graph_k,
             vector_chunks = vector_chunks,
             graph_chunks = graph_chunks,
             merged = merged,
+            timings = timings,
         )
         
 
-        trace_id = self.trace.get_trace_id()  # 获得，没有就创建uuid
+        trace_id = self.trace.get_trace_id()  # obtain trace id (generate UUID if absent)
         self.trace.event(
             "query_done",
             trace_id=trace_id,
