@@ -13,82 +13,8 @@ from graph_rag.application.query_service import QueryService
 from graph_rag.ports.vector_store import VectorStorePort, SearchOptions
 from graph_rag.ports.graph_store import GraphStorePort
 
-
-
-class FakeVectorStore(VectorStorePort):
-    def search(
-            self,
-            query_embedding: List[float],
-            top_k: int,
-            options: Optional[SearchOptions] = None,
-            filter_doc_id: Optional[str] = None,
-            min_score: Optional[float] = None,
-    ) -> List[RetrievedChunk]:
-        r1 = RetrievedChunk(doc_id="d1", chunk_id="c1", text="vector-1", score=0.95, source="vector")
-        r2 = RetrievedChunk(doc_id="d2", chunk_id="c2", text="vector-2", score=0.60, source="vector")
-        return [r1, r2]
-
-class FakeGraphStore(GraphStorePort):
-    def search(self, query: str, top_k: int) -> List[RetrievedChunk]:
-        r3 = RetrievedChunk(doc_id="d3", chunk_id="c3", text="graph-1", score=0.90, source="graph")
-        return [r3]
-
-class FakeVectorStoreMinScore(VectorStorePort):
-    def search(
-            self,
-            query_embedding: List[float],
-            top_k: int,
-            options: Optional[SearchOptions] = None,
-            filter_doc_id: Optional[str] = None,
-            min_score: Optional[float] = None,
-    ) -> List[RetrievedChunk]:
-        r1 = RetrievedChunk(doc_id="d1", chunk_id="c1", text="vector-1", score=0.92, source="vector")
-        r2 = RetrievedChunk(doc_id="d2", chunk_id="c2", text="vector-2", score=0.30, source="vector")
-        return [r1, r2]
-
-class FakeGraphStoreMinScore(GraphStorePort):
-    def search(self, query: str, top_k: int) -> List[RetrievedChunk]:
-        r3 = RetrievedChunk(doc_id="d3", chunk_id="c3", text="graph-1", score=0.88, source="graph")
-        r4 = RetrievedChunk(doc_id="d4", chunk_id="c4", text="graph-2", score=0.20, source="graph")
-
-        return [r3, r4]
-
-
-class FakeVectorStore_only_vector(VectorStorePort):
-    def search(
-            self,
-            query_embedding: List[float],
-            top_k: int,
-            options: Optional[SearchOptions] = None,
-            filter_doc_id: Optional[str] = None,
-            min_score: Optional[float] = None,
-    ) -> List[RetrievedChunk]:
-        r1 = RetrievedChunk(doc_id="d1", chunk_id="c1", text="vector-1", score=0.80, source="vector")
-        return [r1]
-
-class FakeGraphStore_only_vector(GraphStorePort):
-    def search(self, query: str, top_k: int) -> List[RetrievedChunk]:
-        return []
-
-
-
-class FakeVectorStore_only_graph(VectorStorePort):
-    def search(
-            self,
-            query_embedding: List[float],
-            top_k: int,
-            options: Optional[SearchOptions] = None,
-            filter_doc_id: Optional[str] = None,
-            min_score: Optional[float] = None,
-    ) -> List[RetrievedChunk]:
-        return []
-
-class FakeGraphStore_only_graph(GraphStorePort):
-    def search(self, query: str, top_k: int) -> List[RetrievedChunk]:
-        r3 = RetrievedChunk(doc_id="d3", chunk_id="c3", text="graph-1", score=0.88, source="graph")
-
-        return [r3]
-
+from tests.fakes.fake_vector_store import FakeVectorStore, FakeVectorStore_only_graph, FakeVectorStore_only_vector, FakeVectorStoreMinScore
+from tests.fakes.fake_graph_store import FakeGraphStore, FakeGraphStore_only_graph, FakeGraphStore_only_vector, FakeGraphStoreMinScore
 
 
 

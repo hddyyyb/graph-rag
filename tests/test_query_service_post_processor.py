@@ -46,9 +46,9 @@ class FakeKernel(RAGKernelPort):
         self.last_chunks = []
         self.reply = "fake-answer"
 
-    def generate_answer(self, query: str, chunks):
+    def generate_answer(self, query: str, contexts: List[RetrievedChunk]):
         self.last_query = query
-        self.last_chunks = chunks
+        self.last_chunks = contexts
         return self.reply
 
     
