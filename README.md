@@ -6,29 +6,31 @@ The goal of this project is to build a modular Retrieval-Augmented Generation (R
 
 This project focuses on system architecture and engineering design, rather than model optimization.
 
-            +----------------+
-            |   User Query   |
-            +----------------+
-                    |
-                    v
-            +----------------+
-            |  Embedding     |
-            +----------------+
-                    |
-            +-------+-------+
-            |               |
-            v               v
-    Vector Retrieval   Graph Retrieval
-            |               |
-            +-------+-------+
-                    |
-            Retrieval PostProcessor
-                    |
-                    v
-            LLM Generation
-                    |
-                    v
-                Answer
+```markdown
+        +----------------+
+        |   User Query   |
+        +----------------+
+                |
+                v
+        +----------------+
+        |  Embedding     |
+        +----------------+
+                |
+        +-------+-------+
+        |               |
+        v               v
+Vector Retrieval   Graph Retrieval
+        |               |
+        +-------+-------+
+                |
+        Retrieval PostProcessor
+                |
+                v
+        LLM Generation
+                |
+                v
+            Answer
+```
 
 ## System Architecture
 
