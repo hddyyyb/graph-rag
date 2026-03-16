@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from .errors import QueryExecutionError
 
 from graph_rag.domain.errors import ValidationError
 from graph_rag.domain.models import Answer, RetrievedChunk
@@ -49,6 +50,27 @@ class QueryService:
         return q
 
 
+    def _handle_query_failure(
+        self,
+        *,
+        stage: str,
+        error: Exception,
+    ) -> None:
+        trace_id = self.trace.get_trace_id()
+        self.trace.event(
+            "query_failed",
+            trace_id=trace_id,
+            stage=stage,
+            error_type=type(error).__name__,
+            error_message=str(error),
+        )
+        raise QueryExecutionError(
+            stage=stage,
+            message=f"{stage} stage failed: {error}",
+            cause=error,
+        ) from error
+
+
     def _resolve_top_k_values(self, opts: QueryOptions) -> tuple[int, int, int]:
         vector_k = opts.top_k if opts.top_k is not None else self.vector_top_k
         graph_k = opts.top_k if opts.top_k is not None else self.graph_top_k
@@ -84,9 +106,15 @@ class QueryService:
         # vector_retrieval
         if opts.enable_vector:
             start = time.perf_counter()
-            vector_chunks = self.vector_store.search(
-                query_embedding = qemb, 
-                top_k = vector_k
+            try:
+                vector_chunks = self.vector_store.search(
+                    query_embedding = qemb, 
+                    top_k = vector_k
+                    )
+            except Exception as e:
+                self._handle_query_failure(
+                    stage="retrieval",
+                    error = e,
                 )
             timings["vector_retrieval_time"] = time.perf_counter() - start
             chunks.extend(vector_chunks)
@@ -100,9 +128,15 @@ class QueryService:
         # graph_retrieval
         if opts.enable_graph:
             start = time.perf_counter()
-            graph_chunks = self.graph_store.search(
-                query = q, 
-                top_k = graph_k
+            try:
+                graph_chunks = self.graph_store.search(
+                    query = q, 
+                    top_k = graph_k
+                    )
+            except Exception as e:
+                self._handle_query_failure(
+                    stage="retrieval",
+                    error=e,
                 )
             timings["graph_retrieval_time"] = time.perf_counter() - start
             chunks.extend(graph_chunks)
@@ -126,6 +160,7 @@ class QueryService:
         graph_chunks: List[RetrievedChunk],
         merged: List[RetrievedChunk],
         timings: Dict[str, float],
+        stats: Dict[str, int],
     ) -> Dict[str, Any]:
         
         retrieval_debug: Dict[str, Any] = {
@@ -156,8 +191,110 @@ class QueryService:
                 ],
             },
             "timings": timings,
+            "stats": stats,
         }
         return retrieval_debug
+
+
+    def _postprocess_chunks(
+        self,
+        *,
+        chunks,
+        final_top_k: int,
+        min_score,
+        timings,
+        stats,
+    ):
+        start = time.perf_counter()
+        try:
+            processed = self.post_processor.process(
+                chunks= chunks,
+                top_k = final_top_k,
+                min_score = min_score,
+            )
+        except Exception as e:
+            self._handle_query_failure(
+                stage="postprocess",
+                error=e,
+            )
+        timings["postprocess_time"] = time.perf_counter() - start
+        self.trace.event(
+            "retrieval_timing",
+            metric="postprocess_time",
+            elapsed=timings["postprocess_time"],
+        )
+
+        stats["citation_count"] = len(processed.citations)
+        return processed
+
+
+    def _generate_answer_text(
+        self,
+        *,
+        query: str,
+        merged,
+        timings,
+    ):
+        start = time.perf_counter()
+        try:
+            answer_text = self.kernel.generate_answer(
+                query = query, 
+                contexts =  merged
+                )    # 调用Kernel生成answer
+        except Exception as e:
+            self._handle_query_failure(
+                stage="generation",
+                error=e,
+            )
+        timings["llm_generation_time"] = time.perf_counter() - start
+        self.trace.event(
+            "retrieval_timing",
+            metric="llm_generation_time",
+            elapsed=timings["llm_generation_time"],
+        )
+        return answer_text
+
+
+
+    def _build_answer(
+        self,
+        *,
+        answer_text: str,
+        processed,
+        vector_k: int,
+        graph_k: int,
+        vector_chunks,
+        graph_chunks,
+        merged,
+        timings,
+        stats,
+    ):
+        retrieval_debug = self._build_retrieval_debug(
+            vector_k = vector_k,
+            graph_k = graph_k,
+            vector_chunks = vector_chunks,
+            graph_chunks = graph_chunks,
+            merged = merged,
+            timings = timings,
+            stats = stats,
+        )
+        
+
+        trace_id = self.trace.get_trace_id()  # obtain trace id (generate UUID if absent)
+        self.trace.event(
+            "query_done",
+            trace_id=trace_id,
+            merged=len(merged),
+        )
+
+        return Answer(
+            answer=answer_text,
+            trace_id=trace_id,
+            retrieval_debug=retrieval_debug,
+            citations=processed.citations,
+        )
+
+
 
     def query(
         self,
@@ -180,6 +317,7 @@ class QueryService:
         )
 
         q = self._validate_query(query)    # validate input query
+        
         vector_k, graph_k, final_top_k = self._resolve_top_k_values(opts)    # prepare retrieval parameters
 
         timings: Dict[str, float] = {
@@ -189,6 +327,14 @@ class QueryService:
             "postprocess_time": 0.0,
             "llm_generation_time": 0.0,
         }
+
+        stats: Dict[str, int] = {
+            "vector_count" : 0,
+            "graph_count" : 0,
+            "merged_count" : 0,
+            "citation_count" : 0,
+        }
+        
 
         # start trace + compute embedding
         self.trace.bind(query=q)    # attach query to trace context
@@ -205,7 +351,17 @@ class QueryService:
         
         # embedding_time
         start = time.perf_counter()
-        qemb = self.embedder.embed_query(q)
+
+        try:
+            qemb = self.embedder.embed_query(q)
+        except Exception as e:
+            self._handle_query_failure(
+                stage="embedding",
+                error=e,
+            )
+
+
+
         timings["embedding_time"] = time.perf_counter() - start
         self.trace.event(
             "retrieval_timing", 
@@ -223,54 +379,42 @@ class QueryService:
             graph_k = graph_k,
         )
         timings.update(retrieval_timings)
+
+        stats["vector_count"] = len(vector_chunks)
+        stats["graph_count"] = len(graph_chunks)
+        stats["merged_count"] = len(chunks)
         
+
         # post-processing & postprocess_time
-        start = time.perf_counter()
-        processed = self.post_processor.process(
-            chunks= chunks,
-            top_k = final_top_k,
-            min_score = opts.min_score,
+        processed = self._postprocess_chunks(
+            chunks=chunks,
+            final_top_k=final_top_k,
+            min_score=opts.min_score,
+            timings=timings,
+            stats=stats,
         )
-        timings["postprocess_time"] = time.perf_counter() - start
-        self.trace.event(
-            "retrieval_timing",
-            metric="postprocess_time",
-            elapsed=timings["postprocess_time"],
-        )
-        
+
         merged = processed.chunks
 
         # llm_generation_time
-        start = time.perf_counter()
-        answer_text = self.kernel.generate_answer(query = q, contexts =  merged)    # 调用Kernel生成answer
-        timings["llm_generation_time"] = time.perf_counter() - start
-        self.trace.event(
-            "retrieval_timing",
-            metric="llm_generation_time",
-            elapsed=timings["llm_generation_time"],
-        )
+        answer_text = self._generate_answer_text(
+            query = q,
+            merged = merged,
+            timings = timings,
+            )
 
         # build debug info + finalize response
-        retrieval_debug = self._build_retrieval_debug(
+        return self._build_answer(
+            answer_text = answer_text,
+            processed = processed,
             vector_k = vector_k,
             graph_k = graph_k,
             vector_chunks = vector_chunks,
             graph_chunks = graph_chunks,
             merged = merged,
             timings = timings,
+            stats = stats,
         )
+
+
         
-
-        trace_id = self.trace.get_trace_id()  # obtain trace id (generate UUID if absent)
-        self.trace.event(
-            "query_done",
-            trace_id=trace_id,
-            merged=len(merged),
-        )
-
-        return Answer(
-            answer=answer_text,
-            trace_id=trace_id,
-            retrieval_debug=retrieval_debug,
-            citations=processed.citations,
-        )

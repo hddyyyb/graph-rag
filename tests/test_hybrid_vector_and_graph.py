@@ -1,17 +1,10 @@
 from __future__ import annotations
 
-from typing import Optional, List
-
-from graph_rag.domain.models import RetrievedChunk
-
 from graph_rag.infra.adapters import DefaultRetrievalPostProcessor
 from graph_rag.infra.adapters import FakeEmbeddingV2, FakeKernel
 from graph_rag.infra.observability.fake_trace import FakeTrace
 
 from graph_rag.application.query_service import QueryService
-
-from graph_rag.ports.vector_store import VectorStorePort, SearchOptions
-from graph_rag.ports.graph_store import GraphStorePort
 
 from tests.fakes.fake_vector_store import FakeVectorStore, FakeVectorStore_only_graph, FakeVectorStore_only_vector, FakeVectorStoreMinScore
 from tests.fakes.fake_graph_store import FakeGraphStore, FakeGraphStore_only_graph, FakeGraphStore_only_vector, FakeGraphStoreMinScore

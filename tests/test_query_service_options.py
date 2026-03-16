@@ -115,3 +115,18 @@ def test_query_disable_vector_does_not_crash():
     )
 
     assert result is not None
+
+
+def test_query_retrieval_stats():
+    service = build_test_service()
+    answer = service.query(
+        query="hello",
+    )
+
+    assert answer.retrieval_debug is not None
+    stats = answer.retrieval_debug["stats"]
+
+    assert stats["vector_count"] == 2
+    assert stats["graph_count"] == 1
+    assert stats["merged_count"] == 3
+    assert stats["citation_count"] == 3
