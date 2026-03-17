@@ -1,217 +1,177 @@
-# Production-Oriented GraphRAG Project Plan
+# 🚀 PROJECT_PLAN.md (Detailed v2)
 
-## 1. Project Status Rebaseline
+## 0. Project Positioning
 
-This project is currently in a **mid-stage architecture-first state**.
+This project is an industrial-grade GraphRAG system prototype built with Clean Architecture.
 
-### Already completed
-- Clean Architecture style project skeleton is established
-- Domain / Application / Ports / Infra boundaries are defined
-- QueryService main workflow has been built
-- RetrievalPostProcessor supports sorting, deduplication, top_k, min_score, and citations
-- QueryOptions normalization and application-layer parameter flow are in place
-- QueryService observability structure has been partially introduced
-- Error boundary handling and failure semantics have been improved
-- Unit tests currently pass based on fake implementations
+It includes:
+- API Layer (FastAPI)
+- Application Layer (QueryService / IngestService)
+- Domain Models
+- Ports (interfaces)
+- Infra (Embedding / Vector / Graph / LLM)
 
-### Not yet truly implemented
-- Real EmbeddingProvider implementation
-- Real VectorStore implementation
-- Real GraphStore implementation
-- Real indexing pipeline for document ingestion
-- Real API delivery path based on actual retrieval backends
-
-### Important clarification
-The current project is **not yet a fully working GraphRAG system**.
-It is more accurately an **enterprise-oriented application skeleton with testable interfaces and application semantics**.
+⚠️ Current status:
+This is NOT a pure skeleton anymore.
+It is a partially functional system with API + ingest + query pipelines.
 
 ---
 
-## 2. Core Strategy Adjustment
+## 1. Current System Snapshot
 
-The previous route spent too much time polishing the application layer before the lower-level retrieval backends were fully implemented.
+### 1.1 API Layer (COMPLETED)
 
-From this point onward, the priority changes to:
-
-1. implement real backends
-2. complete indexing/data flow
-3. expose API
-4. finalize deployment and project packaging
-
-This means the next phase should focus on turning fake ports into real working modules.
-
----
-
-## 3. Revised Project Phases
+- FastAPI application ready
+- Endpoints:
+  - POST /ingest
+  - POST /query
+  - GET /health
+- Swagger UI available
+- Middleware:
+  - trace_id
+  - logging
+  - error mapping
 
 ---
 
-### Phase A. Architecture Skeleton and Application Layer
-**Status: mostly completed**
+### 1.2 Application Layer (COMPLETED)
 
-Main work:
-- project structure
-- domain models
-- ports and adapters boundaries
-- QueryService workflow
-- RetrievalPostProcessor
-- QueryOptions
-- basic observability events
-- application-level error boundaries
-- fake-driven tests
-
-Goal:
-- make the system replaceable, testable, and extensible
-
----
-
-### Phase B. Real Backend Implementation
-**Estimated duration: 7 days**
-**Top priority**
-
-Main work:
-- implement a real EmbeddingProvider
-- implement a real VectorStore
-- implement a real GraphStore
-
-Target:
-- remove fake core retrieval dependencies
-- make hybrid retrieval actually executable
-
-Deliverables:
-- real embedding generation
-- real vector retrieval
-- real graph retrieval
-- backend integration tests
-
----
-
-### Phase C. Indexing and Data Flow Closure
-**Estimated duration: 5 days**
-
-Main work:
-- document loading
-- chunking
-- embedding generation pipeline
-- vector indexing
-- graph construction
-- offline indexing script
-
-Target:
-- establish a full offline-to-online data loop
-
-Pipeline target:
-raw documents -> chunks -> embeddings -> vector store -> graph store -> query
-
-Deliverables:
-- indexing script
-- sample dataset
-- reproducible ingestion flow
-
----
-
-### Phase D. API and Engineering Integration
-**Estimated duration: 5 days**
-
-Main work:
-- dependency injection
-- composition root
-- FastAPI endpoint
-- config system
-- logging integration
-- API-level error mapping
-
-Target:
-- expose the GraphRAG system as an actual service
-
-Deliverables:
-- runnable API server
-- `/query` endpoint
-- structured response with answer, citations, trace_id, retrieval_debug
-
----
-
-### Phase E. Delivery and Resume Packaging
-**Estimated duration: 4 days**
-
-Main work:
-- Dockerization
-- README rewrite
-- architecture diagram
-- usage examples
-- benchmark/demo case
-- GitHub cleanup
-
-Target:
-- convert the project into a portfolio-grade deliverable
-
-Deliverables:
-- polished repository
-- deployment instructions
-- project highlights for resume/interview use
-
----
-
-## 4. Revised Daily Sequence
-
-### Day19
-Project rebaseline and roadmap rewrite
-
-### Day20-Day26
-Phase B: real backend implementation
+#### QueryService
+- normalize query
+- validate input
 - embedding
-- vector store
-- graph store
+- hybrid retrieval (vector + graph)
+- post-processing:
+  - ranking
+  - min_score filtering
+  - deduplication
+  - top_k
+- LLM answer generation
+- debug info (timings + stats)
 
-### Day27-Day31
-Phase C: indexing and ingestion pipeline
-
-### Day32-Day36
-Phase D: API and engineering integration
-
-### Day37-Day40
-Phase E: delivery, packaging, and presentation
-
----
-
-## 5. Current Execution Rule
-
-Before adding more observability polish or further application-layer refinement, priority must be given to:
-
-- real EmbeddingProvider
-- real VectorStore
-- real GraphStore
-
-Application-layer refinement should continue only after the lower-level retrieval stack becomes real.
+#### IngestService
+- validate document
+- chunk text
+- embedding
+- write vector store
+- write graph store
 
 ---
 
-## 6. Engineering Principle for This Project
+### 1.3 Observability (COMPLETED)
 
-This project should be built according to the following order:
-
-1. architecture boundaries
-2. real backend capability
-3. data flow closure
-4. service exposure
-5. deployment and portfolio polish
-
-Avoid over-polishing fake implementations.
-Prefer minimal but real working capability over elegant but non-executable abstractions.
+- embedding_time
+- vector_retrieval_time
+- graph_retrieval_time
+- postprocess_time
+- llm_generation_time
+- trace_id tracking
 
 ---
 
-## 7. End Goal
+### 1.4 Infra Layer (PARTIAL)
 
-This project aims to become a **production-oriented GraphRAG engineering project** suitable for:
-- AI engineering job applications
-- RAG system portfolio presentation
-- future extension toward enterprise document QA systems
+#### Embedding
+- SentenceTransformer implemented
+- default still uses FakeEmbedding
 
-The final project should demonstrate:
-- clean architecture
-- replaceable retrieval components
+#### Vector Store
+- SQLiteVectorStore implemented
+- supports upsert + cosine search
+
+#### Graph Store
+- currently InMemoryGraphStore
+- NOT real Neo4j yet
+
+---
+
+### 1.5 Testing
+
+- unit tests
+- integration tests
+- service smoke tests
+
+---
+
+## 2. Reality Check
+
+This system is:
+
+✅ API-ready  
+✅ Pipeline-complete  
+❌ Not fully production-ready  
+
+---
+
+## 3. Core Gaps
+
+### 3.1 Runtime Wiring
+- fake components still used
+
+### 3.2 Graph Missing
+- no Neo4j
+- no graph schema
+
+### 3.3 Ingest Pipeline
+- no entity extraction
+- no graph building
+
+---
+
+## 4. Phase Plan
+
+### Phase B: Real Retrieval
+- switch embedding to real
+- switch vector store to SQLite default
+
+### Phase C: GraphRAG
+- implement Neo4jGraphStore
+- graph schema
+- graph retrieval
+
+### Phase D: API Hardening
+- integrate real backends
+- validation
+- integration testing
+- docker deployment
+
+---
+
+## 5. Day Plan
+
+Day20–21:
+- real embedding
+
+Day22–23:
+- SQLite vector
+
+Day24–25:
+- Neo4j graph
+
+Day26–27:
+- graph retrieval
+
+Day28–30:
+- API hardening + deployment
+
+---
+
+## 6. Final Target
+
+Client → FastAPI → Services → Embedding → Vector + Graph → LLM
+
+---
+
+## 7. Interview Summary
+
+This is a clean-architecture GraphRAG system with:
+- full ingest/query pipeline
 - hybrid retrieval
 - observability
-- API service capability
-- deployment readiness
+- partial real infra
+
+---
+
+## 8. One Sentence
+
+Half-real GraphRAG system awaiting full backend integration.

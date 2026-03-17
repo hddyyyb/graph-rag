@@ -23,6 +23,7 @@ dev = [
 llm = [
   "openai>=2.15,<3",
   "httpx>=0.28,<0.29",
+  "sentence-transformers>=3,<4",
 ]
 
 ml = [
