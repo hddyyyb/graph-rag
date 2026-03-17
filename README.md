@@ -1,148 +1,211 @@
-# Production-Oriented GraphRAG
+# 🚀 Production-Oriented GraphRAG System
 
-A production-oriented GraphRAG system built with Clean Architecture.
+> A clean-architecture GraphRAG system with hybrid retrieval (vector + graph), full ingest/query pipeline, and observability.
 
-The goal of this project is to build a modular Retrieval-Augmented Generation (RAG) pipeline supporting hybrid retrieval strategies.
+---
 
-This project focuses on system architecture and engineering design, rather than model optimization.
+## ✨ Overview
+
+This project implements a **production-oriented GraphRAG system** designed with **Clean Architecture** principles.
+
+It is not just a demo — but a **modular, extensible, and observable AI system** that simulates real-world backend engineering for LLM applications.
+
+---
+
+## 🧠 Key Features
+
+- 🔹 **Hybrid Retrieval**
+  - Vector similarity search
+  - Graph-based retrieval (entity-level matching)
+
+- 🔹 **Full Pipeline**
+  - Ingest: document → chunk → embedding → storage
+  - Query: query → embedding → retrieval → post-process → LLM answer
+
+- 🔹 **Clean Architecture**
+  - Domain / Application / Ports / Infra / API
+  - Fully decoupled components
+
+- 🔹 **Pluggable Components**
+  - Embedding models (SentenceTransformer / OpenAI / etc.)
+  - Vector stores (SQLite / Milvus-ready)
+  - Graph stores (InMemory → Neo4j-ready)
+  - LLM backends
+
+- 🔹 **Observability**
+  - Stage-level latency tracking:
+    - embedding_time
+    - retrieval_time
+    - postprocess_time
+    - generation_time
+  - Trace ID propagation
+
+- 🔹 **Engineering-Grade Design**
+  - Error boundaries
+  - Dependency injection
+  - Testable services
+  - Integration tests
+
+---
+
+## 🏗️ Architecture
+
+```
+Client
+↓
+FastAPI (API Layer)
+↓
+Application Layer
+├── QueryService
+└── IngestService
+↓
+Ports (Interfaces)
+↓
+Infra Layer
+├── EmbeddingProvider
+├── VectorStore
+├── GraphStore
+└── RAGKernel (LLM)
+```
+
+---
+
+## 🔄 Data Flow
+
+### Ingest Pipeline
 
 ```markdown
-        +----------------+
-        |   User Query   |
-        +----------------+
-                |
-                v
-        +----------------+
-        |  Embedding     |
-        +----------------+
-                |
-        +-------+-------+
-        |               |
-        v               v
-Vector Retrieval   Graph Retrieval
-        |               |
-        +-------+-------+
-                |
-        Retrieval PostProcessor
-                |
-                v
-        LLM Generation
-                |
-                v
-            Answer
+Document
+→ Chunking
+→ Embedding
+→ Vector Store
+→ Graph Store
 ```
 
-## System Architecture
+### Query Pipeline
 
-The GraphRAG pipeline:
-```
-User Query
-↓
-Embedding
-↓
-Hybrid Retrieval
-├─ Vector Retrieval
-└─ Graph Retrieval
-↓
-Retrieval Post Processing
-↓
-LLM Generation
+```markdown
+Query
+→ Embedding
+→ Hybrid Retrieval (Vector + Graph)
+→ Post-processing
+→ LLM Answer Generation
 ```
 
-The system follows Clean Architecture:
-```
-Domain
-Application
-Ports
-Infrastructure
-API
-```
+---
 
-More details:
-```
-docs/architecture.md
-```
+## ⚙️ Tech Stack
 
-## Key Features
+- Python 3.10+
+- FastAPI
+- SentenceTransformers
+- SQLite (Vector Store)
+- (Planned) Neo4j (Graph Store)
+- Pytest
 
-• Clean Architecture design  
-• Hybrid retrieval (Vector + Graph)  
-• Modular backend adapters  
-• Retrieval observability  
-• Extensible indexing pipeline  
+---
+## 🚦 Current Status
+
+This project is a **partially real GraphRAG system**:
+
+| Component        | Status                  |
+|-----------------|-------------------------|
+| API             | ✅ Implemented           |
+| Ingest Pipeline | ✅ Implemented           |
+| Query Pipeline  | ✅ Implemented           |
+| Embedding       | ✅ Real (SentenceTransformer) |
+| Vector Store    | ✅ SQLite                |
+| Graph Store     | ⚠️ InMemory (Neo4j planned) |
+| Full Production | ❌ Not yet              |
+
+---
+
+## 🧩 Design Philosophy
+
+- Build **real systems**, not demos
+- Prioritize **modularity and replaceability**
+- Separate **business logic from infrastructure**
+- Design for **scalability from day one**
+
+---
 
 
-## Quick Start (Local)
-1) Create virtual environment
-```
+## 🚀 Getting Started
+
+### 1. Install
+
+```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
-2) Start dependencies (Neo4j+Milvus)
-```
-cp .env.example .env
+### 2. Run Services
+
+```bash
 docker compose up -d
 ```
-3) Start API
-```
+
+### 3. Start API
+
+```bash
 uvicorn graph_rag.api.main:app --reload --port 8000
 ```
-Run tests: 
+
+### 4. Open Docs
+
+```bash
+http://localhost:8000/docs
 ```
+
+---
+
+## 📡 API Endpoints
+
+- `POST /ingest` — ingest documents
+
+- `POST /query` — query system
+
+- `GET /health` — health check
+
+---
+
+## 🧪 Testing
+
+```bash
 pytest -q
-pytest -q -s
 ```
+---
 
-4) Access API
-- http://localhost:8000/docs
+## 🧭 Roadmap
 
-## API
-- POST /ingest
-- POST /query
-- GET /health
+- [ ] Replace InMemoryGraphStore with Neo4j
+- [ ]  Introduce entity extraction for graph building
+- [ ]  Integrate Milvus / FAISS for scalable vector search
+- [ ]  Add streaming LLM responses
+- [ ]  Production deployment (Docker + CI/CD)
 
-## Project Constraints
+---
+## 💬 Interview Highlights
 
-This project focuses on system architecture and engineering abstraction.
+- This project demonstrates:
+- System design for LLM applications
+- Clean Architecture in AI systems
+- Hybrid retrieval (vector + graph)
+- Observability in ML pipelines
+- Real-world backend engineering skills
 
-The following topics are intentionally out of scope:
+---
 
-• Algorithm optimization
+## 📌 One-Line Summary
 
-• Prompt tuning
+A **half-real, production-oriented GraphRAG system** designed for extensibility and real backend integration.
 
-• Model performance improvement
-
-The goal is to build a production-oriented GraphRAG system architecture.
-
-
-
-
-## Documentation
-System documentation is located in:
-```
-docs/
-   architecture.md
-   retrieval_design.md
-   indexing_pipeline.md
-   api_design.md
-   observability.md
-```
+---
 
 
-## Development Plan
-Project roadmap:
-```
-PROJECT_PLAN.md
-```
+## 👤 Author
 
-Development phases:
-```
-Phase A  Architecture Skeleton
-Phase B  Retrieval Backends
-Phase C  Indexing Pipeline
-Phase D  API Service
-Phase E  Production Packaging
-```
+Zhang Yun
+PhD in AI | Focus on LLM Optimization & Graph Data Mining
+
