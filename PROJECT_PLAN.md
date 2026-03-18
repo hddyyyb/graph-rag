@@ -1,4 +1,4 @@
-# 🚀 PROJECT_PLAN.md (Detailed v2)
+# 🚀 PROJECT_PLAN.md
 
 ## 0. Project Positioning
 
@@ -12,8 +12,8 @@ It includes:
 - Infra (Embedding / Vector / Graph / LLM)
 
 ⚠️ Current status:
-This is NOT a pure skeleton anymore.
-It is a partially functional system with API + ingest + query pipelines.
+This is no longer just an architecture skeleton.
+It is now a partially functional GraphRAG system with real ingest/query pipelines and partially real infra.
 
 ---
 
@@ -47,7 +47,10 @@ It is a partially functional system with API + ingest + query pipelines.
   - deduplication
   - top_k
 - LLM answer generation
-- debug info (timings + stats)
+- debug info:
+  - timings
+  - retrieval stats
+  - citations
 
 #### IngestService
 - validate document
@@ -66,30 +69,65 @@ It is a partially functional system with API + ingest + query pipelines.
 - postprocess_time
 - llm_generation_time
 - trace_id tracking
+- retrieval debug structure available in query response
 
 ---
 
-### 1.4 Infra Layer (PARTIAL)
+### 1.4 Infra Layer (PARTIALLY REAL)
 
 #### Embedding
-- SentenceTransformer implemented
-- default still uses FakeEmbedding
+- SentenceTransformerEmbeddingProvider implemented
+- system already supports real embedding generation
+- fake embedding still exists only as an alternative backend for tests / lightweight runs
 
 #### Vector Store
 - SQLiteVectorStore implemented
-- supports upsert + cosine search
+- supports persistent upsert
+- supports cosine similarity search
+- supports filter_doc_id / min_score / top_k
+- already wired into container as a selectable runtime backend
+- real vector retrieval path is available
 
 #### Graph Store
 - currently InMemoryGraphStore
 - NOT real Neo4j yet
+- graph ingestion and retrieval are still at placeholder stage
+
+#### LLM
+- fake / local / OpenAI backends can be switched in container
+- runtime backend selection pattern is already established
+---
+
+### 1.5 Runtime Wiring (PARTIAL BUT WORKING)
+
+- container / composition root implemented
+- backend switching already supported for:
+  - llm backend
+  - vector store backend
+- ingest and query services receive dependencies through the same container
+- when vector_store_backend="sqlite", ingest and query already share the same real SQLiteVectorStore instance
 
 ---
 
-### 1.5 Testing
+### 1.6 Testing
 
-- unit tests
-- integration tests
-- service smoke tests
+- unit tests available
+- service-level tests available
+- API smoke tests available
+- unit tests available
+- service-level tests available
+- API smoke tests available
+
+- real SQLite vector retrieval integration tests implemented:
+  - vector-only closed-loop verification
+  - top_k behavior verification
+  - min_score filtering verification
+
+- test system now covers:
+  - service orchestration (fake-based)
+  - vector store correctness (SQLite)
+  - real integration behavior (embedding + SQLite)
+
 
 ---
 
@@ -99,60 +137,91 @@ This system is:
 
 ✅ API-ready  
 ✅ Pipeline-complete  
-❌ Not fully production-ready  
+✅ Real embedding available  
+✅ Real vector store available  
+⚠️ Graph still fake/in-memory  
+✅ Real vector retrieval closed loop validated with dedicated integration tests
+❌ Not fully production-ready
 
 ---
 
 ## 3. Core Gaps
 
-### 3.1 Runtime Wiring
-- fake components still used
+### 3.1 Graph Backend Missing
+- no Neo4jGraphStore yet
+- no graph schema yet
+- no real graph retrieval yet
 
-### 3.2 Graph Missing
-- no Neo4j
-- no graph schema
-
-### 3.3 Ingest Pipeline
+### 3.2 Ingest Pipeline Still Minimal
 - no entity extraction
-- no graph building
+- no relation extraction
+- no graph-building pipeline beyond placeholder upsert
+
+### 3.3 Retrieval Validation Still Incomplete
+- SQLite vector path exists, but still needs explicit closed-loop validation:
+  - ingest -> upsert -> search -> query
+- current project needs stronger proof that the real vector backend is the active runtime path in integration scenarios
+
+### 3.4 Deployment Hardening
+- dockerized real backend composition still incomplete
+- production config / persistence / startup flow still needs tightening
 
 ---
 
 ## 4. Phase Plan
 
-### Phase B: Real Retrieval
-- switch embedding to real
-- switch vector store to SQLite default
+### Phase B: Real Vector Retrieval (COMPLETED ✅)
+- real embedding already completed
+- SQLiteVectorStore already implemented
+- verify SQLite as real runtime retrieval path
+- add explicit integration tests for real vector closed loop
+- optionally switch SQLite to default local backend after validation
 
-### Phase C: GraphRAG
+### Phase C: Real GraphRAG
 - implement Neo4jGraphStore
-- graph schema
-- graph retrieval
+- define graph schema
+- add graph ingest pipeline
+- add real graph retrieval
 
 ### Phase D: API Hardening
-- integrate real backends
-- validation
-- integration testing
-- docker deployment
+- integrate real backends end-to-end
+- improve validation and failure handling
+- add stronger integration testing
+- docker deployment and local reproducibility
 
 ---
 
 ## 5. Day Plan
 
-Day20–21:
-- real embedding
+### Day20
+- real embedding integration
 
-Day22–23:
-- SQLite vector
+### Day21
+- SQLiteVectorStore implementation review
+- runtime wiring confirmation
+- verify that vector store abstraction is already compatible with real backend
 
-Day24–25:
-- Neo4j graph
+### Day22
+- validate SQLite runtime path
+- validate persistence across app restart
+- validate ingest/query closed loop
+- establish memory vs sqlite contrast
 
-Day26–27:
-- graph retrieval
+### Day23
+- introduce minimal GraphStore implementation (in-memory)
+- design graph schema (node / edge)
+- add graph ingest pipeline (basic entity extraction)
+- implement graph retrieval
+- connect graph retrieval into QueryService
 
-Day28–30:
-- API hardening + deployment
+### Day24–25
+- Neo4jGraphStore implementation
+
+### Day26–27
+- graph ingestion + graph retrieval
+
+### Day28–30
+- API hardening + deployment + end-to-end validation
 
 ---
 
@@ -160,18 +229,28 @@ Day28–30:
 
 Client → FastAPI → Services → Embedding → Vector + Graph → LLM
 
+Target end state:
+- real embedding
+- real vector retrieval
+- real graph retrieval
+- observable query pipeline
+- deployable local GraphRAG prototype
+
 ---
 
 ## 7. Interview Summary
 
-This is a clean-architecture GraphRAG system with:
+This is a Clean Architecture GraphRAG system with:
 - full ingest/query pipeline
-- hybrid retrieval
-- observability
-- partial real infra
+- hybrid retrieval orchestration
+- observability and retrieval timing
+- real embedding integration
+- real SQLite vector store integration
+- pluggable runtime backends
+- graph backend still under construction
 
 ---
 
 ## 8. One Sentence
 
-Half-real GraphRAG system awaiting full backend integration.
+A partially real GraphRAG system: real embedding and real SQLite vector retrieval are already in place, while graph infrastructure and full end-to-end hardening are still in progress.

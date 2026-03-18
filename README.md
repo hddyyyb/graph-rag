@@ -180,10 +180,10 @@ pytest -q
 ## 🧭 Roadmap
 
 - [ ] Replace InMemoryGraphStore with Neo4j
-- [ ]  Introduce entity extraction for graph building
-- [ ]  Integrate Milvus / FAISS for scalable vector search
-- [ ]  Add streaming LLM responses
-- [ ]  Production deployment (Docker + CI/CD)
+- [ ] Introduce entity extraction for graph building
+- [ ] Integrate Milvus / FAISS for scalable vector search
+- [ ] Add streaming LLM responses
+- [ ] Production deployment (Docker + CI/CD)
 
 ---
 ## 💬 Interview Highlights
