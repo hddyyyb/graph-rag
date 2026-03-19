@@ -1,5 +1,3 @@
-# 🚀 PROJECT_PLAN.md
-
 ## 0. Project Positioning
 
 This project is an industrial-grade GraphRAG system prototype built with Clean Architecture.
@@ -141,8 +139,10 @@ This system is:
 ✅ Real vector store available  
 ⚠️ Graph still fake/in-memory  
 ✅ Real vector retrieval closed loop validated with dedicated integration tests
-❌ Not fully production-ready
-
+❌ Not fully production-ready:
+   - graph retrieval is not production-grade
+   - no persistent graph backend
+   - no multi-hop reasoning
 ---
 
 ## 3. Core Gaps
@@ -207,22 +207,215 @@ This system is:
 - validate ingest/query closed loop
 - establish memory vs sqlite contrast
 
-### Day23
+
+### Day23 - GraphRAG Minimal Implementation
 - introduce minimal GraphStore implementation (in-memory)
 - design graph schema (node / edge)
 - add graph ingest pipeline (basic entity extraction)
 - implement graph retrieval
 - connect graph retrieval into QueryService
 
-### Day24–25
-- Neo4jGraphStore implementation
+#### What was introduced
 
-### Day26–27
-- graph ingestion + graph retrieval
+- InMemoryGraphStore (minimal graph backend)
+- Chunk-level graph modeling (ChunkGraphRecord)
+- Term-based graph retrieval
+- Graph retrieval integrated into QueryService (via enable_graph flag)
 
-### Day28–30
-- API hardening + deployment + end-to-end validation
+#### Data Flow
 
+Ingest:
+Document → Chunk → Terms extraction → ChunkGraphRecord → GraphStore
+
+Query:
+Query → Terms → GraphStore search → RetrievedChunks → Merge → Answer
+
+#### Current Limitations
+
+- No real entity extraction (rule-based terms only)
+- No graph traversal (no multi-hop)
+- No advanced ranking (term overlap only)
+- No persistent graph backend (in-memory only)
+
+#### Status
+
+Graph is now a first-class retrieval signal (alongside vector).
+System upgraded from VectorRAG → GraphRAG (minimal version).
+
+### Day24–25 — Neo4j Graph Backend Implementation
+
+Objective:
+Replace InMemoryGraphStore with a real graph database backend (Neo4j), while keeping Application layer unchanged.
+
+Tasks:
+
+- Design Neo4j graph schema:
+  - (:Chunk {chunk_id, doc_id, text})
+  - (:Term {name})
+  - (Chunk)-[:MENTIONS]->(Term)
+  - (Term)-[:CO_OCCURS_WITH {weight}]->(Term)
+
+- Implement Neo4jGraphStore:
+  - upsert_chunk_graphs(records)
+  - search(query, top_k)
+
+- Implement:
+  - term-based lookup via Cypher
+  - basic scoring (term overlap or frequency)
+
+- Integrate Neo4j driver (bolt/http)
+
+- Extend container:
+  - support `graph_store_backend = memory | neo4j`
+
+Constraints:
+
+- Do NOT change:
+  - GraphStorePort
+  - IngestService / QueryService interfaces
+
+- Do NOT implement:
+  - multi-hop traversal
+  - advanced ranking
+
+Deliverable:
+
+- Neo4jGraphStore fully working
+- Graph backend swappable (memory / neo4j)
+
+---
+
+### Day26 — Neo4j Graph End-to-End Validation
+
+Objective:
+Ensure Neo4j backend is fully functional and consistent with existing behavior.
+
+Tasks:
+
+- Write tests:
+  - Neo4jGraphStore upsert + search
+  - ingest → Neo4j write verification
+  - query(enable_graph=True) → Neo4j retrieval
+
+- Cross-backend comparison:
+  - memory graph vs neo4j graph (same input → similar output)
+
+- Validate:
+  - graph-only retrieval path
+  - correctness of scoring and top_k
+
+- Add observability:
+  - trace graph_hit_count
+  - trace neo4j query timing
+
+Deliverable:
+
+- Verified Neo4j graph retrieval pipeline
+- No regression vs InMemoryGraphStore
+
+---
+
+### Day27–28 — Advanced Vector Store Backend
+
+Objective:
+Upgrade vector backend from SQLite to a production-grade vector database.
+
+Options (choose ONE):
+
+- Milvus (preferred for industry realism)
+- Qdrant (preferred for simplicity and local dev)
+- (Optional fallback) FAISS (embedded)
+
+Tasks:
+
+- Implement new VectorStore:
+  - upsert(doc_id, chunks, embeddings)
+  - search(query_embedding, top_k)
+
+- Integrate backend:
+  - docker / local service
+  - connection config
+
+- Extend container:
+  - `vector_store_backend = memory | sqlite | <new_backend>`
+
+- Ensure compatibility:
+  - no changes to QueryService
+  - same interface as existing VectorStorePort
+
+Deliverable:
+
+- Real vector database integrated
+- Backend switchable without code changes
+
+---
+
+### Day29 — End-to-End System Hardening
+
+Objective:
+Stabilize the system for real usage and demos.
+
+Tasks:
+
+- Full pipeline validation:
+  - ingest → vector + graph → query → answer
+
+- Edge case handling:
+  - empty query
+  - no hits
+  - backend unavailable
+
+- Error classification:
+  - InvalidArgument / Unavailable / Internal
+
+- Config validation:
+  - backend selection
+  - connection failure handling
+
+- Improve logging & trace:
+  - trace_id propagation
+  - retrieval timings (vector / graph)
+
+Deliverable:
+
+- Robust, failure-aware system behavior
+- Clean observability signals
+
+---
+
+### Day30 — Final Integration & Production-Ready Packaging
+
+Objective:
+Prepare the project as a production-grade portfolio system.
+
+Tasks:
+
+- Final E2E test:
+  - real embedding + Neo4j + vector DB
+
+- Docker Compose:
+  - API + Neo4j + vector DB
+
+- API validation:
+  - /ingest
+  - /query
+  - /health
+
+- Documentation update:
+  - architecture overview
+  - backend switching
+  - system flow diagrams
+
+- README enhancement:
+  - GraphRAG explanation
+  - design decisions
+  - system capabilities
+
+Deliverable:
+
+- Fully runnable system (one-command startup)
+- Production-level README
+- Interview-ready project
 ---
 
 ## 6. Final Target

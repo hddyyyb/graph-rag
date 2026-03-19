@@ -118,6 +118,17 @@ This project is a **partially real GraphRAG system**:
 | Graph Store     | ⚠️ InMemory (Neo4j planned) |
 | Full Production | ❌ Not yet              |
 
+
+### Graph Retrieval (NEW)
+
+The system now supports a minimal GraphRAG capability:
+
+- Builds a lightweight graph during ingestion (term co-occurrence)
+- Enables graph-based retrieval via keyword matching
+- Can be toggled via `enable_graph=True`
+
+This is an initial step toward full GraphRAG support (Neo4j, multi-hop reasoning planned).
+
 ---
 
 ## 🧩 Design Philosophy
