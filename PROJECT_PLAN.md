@@ -87,9 +87,21 @@ It is now a partially functional GraphRAG system with real ingest/query pipeline
 - real vector retrieval path is available
 
 #### Graph Store
-- currently InMemoryGraphStore
-- NOT real Neo4j yet
-- graph ingestion and retrieval are still at placeholder stage
+
+- InMemoryGraphStore (baseline implementation)
+- Neo4jGraphStore implemented
+- supports:
+  - chunk-term graph modeling
+  - term-based retrieval
+  - Cypher-based lookup
+- graph backend is now swappable:
+  - memory / neo4j
+- graph-only retrieval closed loop verified via API integration tests
+
+⚠️ Current limitations:
+- no multi-hop traversal
+- no advanced graph scoring
+- no entity-level modeling (term-based only)
 
 #### LLM
 - fake / local / OpenAI backends can be switched in container
@@ -137,7 +149,8 @@ This system is:
 ✅ Pipeline-complete  
 ✅ Real embedding available  
 ✅ Real vector store available  
-⚠️ Graph still fake/in-memory  
+✅ Graph backend now supports Neo4j (real backend)
+⚠️ Graph retrieval still basic (term-level, no multi-hop)  
 ✅ Real vector retrieval closed loop validated with dedicated integration tests
 ❌ Not fully production-ready:
    - graph retrieval is not production-grade
@@ -147,10 +160,14 @@ This system is:
 
 ## 3. Core Gaps
 
-### 3.1 Graph Backend Missing
-- no Neo4jGraphStore yet
-- no graph schema yet
-- no real graph retrieval yet
+### 3.1 Graph Retrieval Still Basic
+- Neo4jGraphStore implemented
+- graph schema is minimal (Chunk / Term)
+- retrieval is term-overlap based
+- no:
+  - multi-hop traversal
+  - path-based reasoning
+  - graph-aware ranking
 
 ### 3.2 Ingest Pipeline Still Minimal
 - no entity extraction
@@ -177,11 +194,16 @@ This system is:
 - add explicit integration tests for real vector closed loop
 - optionally switch SQLite to default local backend after validation
 
-### Phase C: Real GraphRAG
-- implement Neo4jGraphStore
-- define graph schema
-- add graph ingest pipeline
-- add real graph retrieval
+### Phase C: Real GraphRAG (PARTIALLY COMPLETED)
+- Neo4jGraphStore implemented
+- graph ingestion pipeline established
+- graph-only retrieval validated
+
+Next:
+
+- improve graph scoring
+- introduce entity-level modeling
+- add multi-hop retrieval
 
 ### Phase D: API Hardening
 - integrate real backends end-to-end
@@ -242,46 +264,50 @@ Query → Terms → GraphStore search → RetrievedChunks → Merge → Answer
 Graph is now a first-class retrieval signal (alongside vector).
 System upgraded from VectorRAG → GraphRAG (minimal version).
 
-### Day24–25 — Neo4j Graph Backend Implementation
+### Day24 — Neo4j Graph Backend Implementation (COMPLETED ✅)
+
+- Neo4jGraphStore implemented
+- schema defined:
+  - Chunk / Term / MENTIONS / CO_OCCURS_WITH
+- Cypher-based ingestion and retrieval implemented
+- graph backend successfully integrated into container
+- graph-only API closed loop validated:
+  - /ingest → Neo4j write
+  - /query(enable_graph=True) → Neo4j retrieval
+
+---
+
+### Day25 — Configuration Unification & Runtime Stability
 
 Objective:
-Replace InMemoryGraphStore with a real graph database backend (Neo4j), while keeping Application layer unchanged.
+Stabilize runtime configuration and ensure clean backend switching.
 
 Tasks:
 
-- Design Neo4j graph schema:
-  - (:Chunk {chunk_id, doc_id, text})
-  - (:Term {name})
-  - (Chunk)-[:MENTIONS]->(Term)
-  - (Term)-[:CO_OCCURS_WITH {weight}]->(Term)
+- unify all runtime configs into Settings:
+  - vector_store_backend
+  - graph_store_backend
+  - llm_backend
+  - sqlite_path
+  - neo4j configs
 
-- Implement Neo4jGraphStore:
-  - upsert_chunk_graphs(records)
-  - search(query, top_k)
+- refactor build_container():
+  - remove direct usage of settings_override dict
+  - rely only on Settings object
 
-- Implement:
-  - term-based lookup via Cypher
-  - basic scoring (term overlap or frequency)
+- validate:
+  - backend switching via create_app(settings_override)
+  - no API layer changes required
 
-- Integrate Neo4j driver (bolt/http)
-
-- Extend container:
-  - support `graph_store_backend = memory | neo4j`
-
-Constraints:
-
-- Do NOT change:
-  - GraphStorePort
-  - IngestService / QueryService interfaces
-
-- Do NOT implement:
-  - multi-hop traversal
-  - advanced ranking
+- add integration tests:
+  - backend switching correctness
+  - container consistency
 
 Deliverable:
 
-- Neo4jGraphStore fully working
-- Graph backend swappable (memory / neo4j)
+- clean configuration system
+- deterministic runtime behavior
+- improved engineering consistency
 
 ---
 
@@ -417,6 +443,10 @@ Deliverable:
 - Production-level README
 - Interview-ready project
 ---
+
+
+最后，回去优化chunk切分部分
+
 
 ## 6. Final Target
 

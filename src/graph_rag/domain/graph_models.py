@@ -25,4 +25,4 @@ class ChunkGraphRecord:
     chunk_id: str
     doc_id: str
     text: str
-    terms: List[str]    # 表明抽取工作已经在GraphStore外面完成了
+    terms: List[str] = None    # 表明抽取工作已经在GraphStore外面完成了

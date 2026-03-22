@@ -7,6 +7,8 @@ STOPWORDS = {
 }
 
 def extract_terms(text: str) -> List[str]:
+    if not text:
+        return []
     tokens = re.findall(r"[a-zA-Z0-9_]+", text.lower())
     results = []
     seen = set()

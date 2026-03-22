@@ -1,5 +1,5 @@
 from .milvus_store import InMemoryVectorStore
-from .neo4j_store import InMemoryGraphStore
+
 from .llamaindex_kernel import SimpleKernel
 from .simple_rag_kernel import SimpleRAGKernel
 from .fake_kernel import FakeKernel
@@ -8,6 +8,8 @@ from .fake_embedding_v2 import FakeEmbeddingV2
 from .sentence_transformer_embedding import SentenceTransformerEmbeddingProvider
 from .embedding_provider import HashEmbeddingProvider
 
+from .in_memory_graph_store import InMemoryGraphStore
+from .neo4j_graph_store import Neo4jGraphStore
 
 from .clock import SystemClock, FixedClock
 from .sqlite_vector_store import SQLiteVectorStore
@@ -26,6 +28,7 @@ __all__ = [
     "FakeEmbeddingV2",
     "InMemoryVectorStore",
     "InMemoryGraphStore",
+    "Neo4jGraphStore",
     "SystemClock",
     "FixedClock",
     "SQLiteVectorStore", 

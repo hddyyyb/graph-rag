@@ -13,9 +13,13 @@ from graph_rag.domain.errors import (
     NotFoundError,
     ValidationError,
 )
+
+from neo4j import GraphDatabase
+
 from graph_rag.infra.adapters import (
     HashEmbeddingProvider,
     InMemoryGraphStore,
+    Neo4jGraphStore,
     InMemoryVectorStore,
     SQLiteVectorStore,
     SimpleKernel,
@@ -27,20 +31,42 @@ from graph_rag.infra.adapters import (
     LocalLLM,
     DefaultRetrievalPostProcessor,
 )
+from graph_rag.application import IngestService, QueryService
+
 from graph_rag.infra.config import Settings
 from graph_rag.infra.observability.logging import SimpleTrace, setup_logging
-
-
-
 
 
 # api/main.py 这是FastAPI应用入口, 负责"把系统装配起来并跑起来"
 
 
-def build_container(settings_override ={
-        "vector_store_backend": "memory"
-    }) -> Dict[str, Any]:  # 创建DI容器（settings、trace、stores、services等实例）
-    settings = Settings()                 # 2.1 Settings与日志初始化, 通常是配置入口：默认值、环境变量读取（你注释里Day2/Day3暗示后续会从env加载）
+def build_graph_store(settings: Settings):
+    backend = settings.graph_store_backend.lower()
+
+    if backend == "memory":
+        return InMemoryGraphStore()
+
+    if backend == "neo4j":
+        driver = GraphDatabase.driver(
+            settings.neo4j_uri,
+            auth=(settings.neo4j_username, settings.neo4j_password),
+        )
+        return Neo4jGraphStore(
+            driver=driver,
+            database=settings.neo4j_database,
+            ensure_schema_on_init=True,
+        )
+
+    raise ValueError(f"Unsupported graph_store_backend: {settings.graph_store_backend}")
+
+
+def build_settings(settings_override: dict | None = None) -> Settings:
+    return Settings(**(settings_override or {}))
+
+
+def build_container(settings_override: dict | None = None) -> Dict[str, Any]: 
+    # 创建DI容器（settings、trace、stores、services等实例）
+    settings = build_settings(settings_override) # 2.1 Settings与日志初始化, 通常是配置入口：默认值、环境变量读取（你注释里Day2/Day3暗示后续会从env加载）
     setup_logging(settings.log_level)     # 把日志系统按配置初始化, 日志初始化要尽早做, 因为后面构造组件/处理请求都要记录日志。
 
     clock = SystemClock()
@@ -48,23 +74,20 @@ def build_container(settings_override ={
 
     post_processor = DefaultRetrievalPostProcessor()
 
-    llm_backend = (settings_override or {}).get("llm_backend", "fake")
+    llm_backend = settings.llm_backend
     if llm_backend == "fake":
         llm = FakeLLM()
     elif llm_backend == "local":
         llm = LocalLLM(
-            base_url=(settings_override or {}).get("local_llm_base_url", "http://localhost:11434"),
-            model=(settings_override or {}).get("local_llm_model", "llama3"),
+            base_url=settings.local_llm_base_url,
+            model=settings.local_llm_model,
         )
     elif llm_backend == "openai":
         from graph_rag.infra.adapters import OpenAILLM
         llm = OpenAILLM(
-            api_key=(settings_override or {}).get("openai_api_key"),
-            model=(settings_override or {}).get("openai_model", "gpt-5"),
-            instructions=(settings_override or {}).get(
-                "openai_instructions",
-                "You are a helpful assistant.",
-            ),
+            api_key=settings.openai_api_key,
+            model=settings.openai_model,
+            instructions=settings.openai_instructions,
         )
     else:
         raise ValueError(f"unknown llm_backend: {llm_backend}")
@@ -73,16 +96,18 @@ def build_container(settings_override ={
     # 让上层服务依赖抽象接口，而不是依赖具体实现。
     # InMemory-> Milvus/FAISS/Neo4j/PGVector/真实Embedding API等。
 
-    vector_store_backend = (settings_override or {}).get("vector_store_backend", "memory")
+    vector_store_backend = settings.vector_store_backend
 
     if vector_store_backend == "sqlite":
-        sqlite_path = (settings_override or {}).get("sqlite_path")
+        sqlite_path = settings.sqlite_path
         if not sqlite_path:
             raise ValueError("sqlite backend requires sqlite_path")
         vector_store = SQLiteVectorStore(sqlite_path)
     else:
         vector_store = InMemoryVectorStore()
-    graph_store = InMemoryGraphStore()
+    
+    graph_store = build_graph_store(settings)
+    
     # embedder = HashEmbeddingProvider(dim=32)
     embedder = FakeEmbeddingV2()
     
@@ -90,7 +115,6 @@ def build_container(settings_override ={
     kernel = SimpleRAGKernel(llm=llm)
 
     # Application services  2.4 Application services：业务用例层（Ingest/Query）
-    from graph_rag.application import IngestService, QueryService
 
 
 
@@ -133,11 +157,8 @@ def build_container(settings_override ={
     }
 
 
-def create_app( settings_override ={
-        "vector_store_backend": "memory"
-    } ) -> FastAPI:    # 构建FastAPI实例并挂载所有东西
-
-
+def create_app(settings_override: dict | None = None) -> FastAPI:
+    # 构建FastAPI实例并挂载所有东西
     app = FastAPI(title="GraphRAG", version="0.1.0")
 
     # Build DI container
