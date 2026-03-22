@@ -12,6 +12,25 @@ from neo4j import GraphDatabase
 from graph_rag.domain.graph_models import ChunkGraphRecord
 from graph_rag.infra.adapters import Neo4jGraphStore
 
+"""
+Integration tests for Neo4jGraphStore.
+
+These tests validate the infrastructure adapter itself rather than only
+the API-level closed loop. Coverage includes:
+
+- single-record and batch upsert
+- term-based retrieval
+- top_k truncation
+- ranking by term overlap
+- boundary cases such as empty queries and invalid top_k
+- persistence of core graph relations:
+  Chunk-[:MENTIONS]->Term
+  Term-[:CO_OCCURS_WITH]->Term
+
+Overall, this test module focuses on real integration between:
+Python code + Neo4j driver + a real Neo4j database.
+"""
+
 
 # -----------------------------------------------------------------------------
 # test config helpers
@@ -45,6 +64,7 @@ def _require_neo4j_env() -> tuple[str, str, str, str | None]:
 
 
 def _random_suffix() -> str:
+    """Generate a short random suffix to avoid ID collisions across tests."""
     return uuid.uuid4().hex[:8]
 
 
@@ -54,6 +74,11 @@ def _random_suffix() -> str:
 
 @pytest.fixture
 def neo4j_driver():
+    """
+    Provide a real Neo4j driver for integration tests.
+
+    The driver is created before the test and automatically closed after it.
+    """
     uri, username, password, _ = _require_neo4j_env()
     driver = GraphDatabase.driver(uri, auth=(username, password))
     try:
@@ -64,6 +89,7 @@ def neo4j_driver():
 
 @pytest.fixture
 def neo4j_database() -> str | None:
+    """Return the configured Neo4j database name, if provided."""
     _, _, _, database = _require_neo4j_env()
     return database
 
@@ -74,7 +100,8 @@ def clean_graph(neo4j_driver, neo4j_database):
     Best-effort cleanup before and after each test.
 
     For local isolated testing, clearing the whole graph is acceptable.
-    If later you want safer multi-tenant tests, switch to prefix-based cleanup.
+    If safer multi-tenant testing is needed later, this can be replaced
+    with prefix-based cleanup.
     """
     _wipe_all_nodes(neo4j_driver, neo4j_database)
     try:
@@ -88,6 +115,7 @@ def clean_graph(neo4j_driver, neo4j_database):
 # -----------------------------------------------------------------------------
 
 def _wipe_all_nodes(driver, database: str | None) -> None:
+    """Remove all nodes and relationships from the test database."""
     with driver.session(database=database) as session:
         session.run("MATCH (n) DETACH DELETE n")
 
@@ -97,6 +125,11 @@ def _wipe_all_nodes(driver, database: str | None) -> None:
 # -----------------------------------------------------------------------------
 
 def _make_store(neo4j_driver, neo4j_database) -> Neo4jGraphStore:
+    """
+    Create the system under test.
+
+    This helper keeps store construction consistent across test cases.
+    """
     return Neo4jGraphStore(
         driver=neo4j_driver,
         database=neo4j_database,
@@ -112,11 +145,13 @@ def _make_record(
     terms: list[str] | None = None,
 ):
     """
-    Adjust this helper if your ChunkGraphRecord has a different constructor.
+    Build a ChunkGraphRecord for tests.
+
+    Adjust this helper if ChunkGraphRecord uses a different constructor.
 
     Current assumption:
     ChunkGraphRecord(chunk_id=..., doc_id=..., text=..., terms=...)
-    If your model does not have 'terms', remove it.
+    If your model does not support 'terms', remove that field here.
     """
     if terms is None:
         return ChunkGraphRecord(
@@ -139,6 +174,9 @@ def _make_record(
 
 @pytest.mark.integration
 def test_upsert_and_search_basic(neo4j_driver, neo4j_database, clean_graph):
+    """
+    Verify that a single upserted graph record can be retrieved by search().
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     chunk_id = f"c1_{_random_suffix()}"
@@ -161,11 +199,14 @@ def test_upsert_and_search_basic(neo4j_driver, neo4j_database, clean_graph):
     assert results[0].doc_id == doc_id
     assert "Neo4j graph retrieval supports relationship queries" == results[0].text
     assert results[0].source == "graph"
-    assert results[0].score >= 1.0
+    assert results[0].score >= 1.0    # score 的计算：WITH c, count(DISTINCT t) AS score
 
 
 @pytest.mark.integration
 def test_search_returns_empty_for_unknown_term(neo4j_driver, neo4j_database, clean_graph):
+    """
+    Verify that search() returns an empty list when the query term does not exist.
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     store.upsert_chunk_graphs(
@@ -185,6 +226,9 @@ def test_search_returns_empty_for_unknown_term(neo4j_driver, neo4j_database, cle
 
 @pytest.mark.integration
 def test_search_respects_top_k(neo4j_driver, neo4j_database, clean_graph):
+    """
+    Verify that search() respects the requested top_k limit.
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     records = [
@@ -218,6 +262,9 @@ def test_search_returns_multiple_hits_sorted_by_term_overlap(
     neo4j_database,
     clean_graph,
 ):
+    """
+    Verify that multiple hits are sorted by descending term overlap score.
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     high_match_chunk_id = f"c_high_{_random_suffix()}"
@@ -247,6 +294,9 @@ def test_search_returns_multiple_hits_sorted_by_term_overlap(
 
 @pytest.mark.integration
 def test_search_returns_empty_for_empty_query(neo4j_driver, neo4j_database, clean_graph):
+    """
+    Verify that empty or whitespace-only queries return no results.
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     store.upsert_chunk_graphs(
@@ -269,6 +319,9 @@ def test_search_returns_empty_when_top_k_is_non_positive(
     neo4j_database,
     clean_graph,
 ):
+    """
+    Verify that non-positive top_k values return no results.
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     store.upsert_chunk_graphs(
@@ -287,6 +340,9 @@ def test_search_returns_empty_when_top_k_is_non_positive(
 
 @pytest.mark.integration
 def test_upsert_supports_multiple_records(neo4j_driver, neo4j_database, clean_graph):
+    """
+    Verify that batch upsert persists multiple records correctly.
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     chunk_id_1 = f"c1_{_random_suffix()}"
@@ -316,6 +372,10 @@ def test_upsert_supports_multiple_records(neo4j_driver, neo4j_database, clean_gr
 
 @pytest.mark.integration
 def test_upsert_uses_record_terms_if_available(neo4j_driver, neo4j_database, clean_graph):
+    """
+    Verify that explicit record terms are used when provided, even if the
+    corresponding keyword does not appear in the raw text.
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     chunk_id = f"c_terms_{_random_suffix()}"
@@ -340,10 +400,11 @@ def test_upsert_uses_record_terms_if_available(neo4j_driver, neo4j_database, cle
 @pytest.mark.integration
 def test_co_occurs_edges_are_created(neo4j_driver, neo4j_database, clean_graph):
     """
-    This test checks storage-side behavior directly in Neo4j.
+    Verify that CO_OCCURS_WITH edges are persisted when multiple terms belong
+    to the same record.
 
-    It is useful because CO_OCCURS_WITH is not yet used by search(),
-    but Day24 schema still wants it to be persisted.
+    This checks storage-side behavior directly in Neo4j. The relation is not
+    necessarily used by search() yet, but it is still part of the intended schema.
     """
     store = _make_store(neo4j_driver, neo4j_database)
 
@@ -373,6 +434,9 @@ def test_co_occurs_edges_are_created(neo4j_driver, neo4j_database, clean_graph):
 
 @pytest.mark.integration
 def test_mentions_edges_are_created(neo4j_driver, neo4j_database, clean_graph):
+    """
+    Verify that Chunk -> Term MENTIONS edges are persisted correctly.
+    """
     store = _make_store(neo4j_driver, neo4j_database)
 
     chunk_id = f"c_mentions_{_random_suffix()}"
