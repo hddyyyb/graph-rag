@@ -36,88 +36,12 @@ Python code + Neo4j driver + a real Neo4j database.
 # test config helpers
 # -----------------------------------------------------------------------------
 
-def _require_neo4j_env() -> tuple[str, str, str, str | None]:
-    """
-    Read Neo4j test connection info from environment variables.
-
-    Expected env vars:
-    - NEO4J_URI
-    - NEO4J_USERNAME
-    - NEO4J_PASSWORD
-    Optional:
-    - NEO4J_DATABASE
-
-    If required vars are missing, the test module will be skipped.
-    """
-    uri = os.getenv("NEO4J_URI")
-    username = os.getenv("NEO4J_USERNAME")
-    password = os.getenv("NEO4J_PASSWORD")
-    database = os.getenv("NEO4J_DATABASE")
-
-    if not uri or not username or not password:
-        pytest.skip(
-            "Neo4j test env is not configured. "
-            "Please set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD."
-        )
-
-    return uri, username, password, database
-
 
 def _random_suffix() -> str:
     """Generate a short random suffix to avoid ID collisions across tests."""
     return uuid.uuid4().hex[:8]
 
 
-# -----------------------------------------------------------------------------
-# fixtures
-# -----------------------------------------------------------------------------
-
-@pytest.fixture
-def neo4j_driver():
-    """
-    Provide a real Neo4j driver for integration tests.
-
-    The driver is created before the test and automatically closed after it.
-    """
-    uri, username, password, _ = _require_neo4j_env()
-    driver = GraphDatabase.driver(uri, auth=(username, password))
-    try:
-        yield driver
-    finally:
-        driver.close()
-
-
-@pytest.fixture
-def neo4j_database() -> str | None:
-    """Return the configured Neo4j database name, if provided."""
-    _, _, _, database = _require_neo4j_env()
-    return database
-
-
-@pytest.fixture
-def clean_graph(neo4j_driver, neo4j_database):
-    """
-    Best-effort cleanup before and after each test.
-
-    For local isolated testing, clearing the whole graph is acceptable.
-    If safer multi-tenant testing is needed later, this can be replaced
-    with prefix-based cleanup.
-    """
-    _wipe_all_nodes(neo4j_driver, neo4j_database)
-    try:
-        yield
-    finally:
-        _wipe_all_nodes(neo4j_driver, neo4j_database)
-
-
-# -----------------------------------------------------------------------------
-# cleanup utilities
-# -----------------------------------------------------------------------------
-
-def _wipe_all_nodes(driver, database: str | None) -> None:
-    """Remove all nodes and relationships from the test database."""
-    with driver.session(database=database) as session:
-        session.run("MATCH (n) DETACH DELETE n")
 
 
 # -----------------------------------------------------------------------------

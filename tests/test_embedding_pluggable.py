@@ -6,7 +6,7 @@ from graph_rag.api.main import create_app
 
 
 def test_embedding_pluggable():
-    app = create_app()
+    app = create_app(settings_override = {'embedding_backend':'fake'})
     client = TestClient(app)
 
     ingest_payload = {"doc_id":"doc777","text":"a simple Try","metadata":{"source":"unit_test"}}

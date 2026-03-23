@@ -18,13 +18,14 @@ from neo4j import GraphDatabase
 
 from graph_rag.infra.adapters import (
     HashEmbeddingProvider,
+    SentenceTransformerEmbeddingProvider,
+    FakeEmbeddingV2,
     InMemoryGraphStore,
     Neo4jGraphStore,
     InMemoryVectorStore,
     SQLiteVectorStore,
     SimpleKernel,
     SimpleRAGKernel,
-    FakeEmbeddingV2,
     SystemClock,
     FixedClock,
     FakeLLM,
@@ -64,12 +65,14 @@ def build_settings(settings_override: dict | None = None) -> Settings:
     return Settings(**(settings_override or {}))
 
 
-def build_container(settings_override: dict | None = None) -> Dict[str, Any]: 
+def build_container(settings: Settings) -> Dict[str, Any]: 
     # 创建DI容器（settings、trace、stores、services等实例）
-    settings = build_settings(settings_override) # 2.1 Settings与日志初始化, 通常是配置入口：默认值、环境变量读取（你注释里Day2/Day3暗示后续会从env加载）
     setup_logging(settings.log_level)     # 把日志系统按配置初始化, 日志初始化要尽早做, 因为后面构造组件/处理请求都要记录日志。
 
     clock = SystemClock()
+    
+    
+    # 第一步：先实例化底层基础组件（Clock、Trace、PostProcessor、LLM、Stores、Embedder等），这些组件没有业务逻辑，主要负责和外部系统交互（数据库、embedding API、LLM API等）。
     trace = SimpleTrace(clock = clock)                 # 2.2 Trace对象：请求链路的“上下文”
 
     post_processor = DefaultRetrievalPostProcessor()
@@ -108,18 +111,21 @@ def build_container(settings_override: dict | None = None) -> Dict[str, Any]:
     
     graph_store = build_graph_store(settings)
     
-    # embedder = HashEmbeddingProvider(dim=32)
-    embedder = FakeEmbeddingV2()
-    
+    embedding_backend = settings.embedding_backend
+    if embedding_backend == 'sentence_transformer':
+        embedder = SentenceTransformerEmbeddingProvider()
+    elif embedding_backend == 'hash':
+        embedder = HashEmbeddingProvider(dim=32)
+    elif embedding_backend == 'fake':
+        embedder = FakeEmbeddingV2()
+
+
     #kernel = SimpleKernel()
     kernel = SimpleRAGKernel(llm=llm)
-
     # Application services  2.4 Application services：业务用例层（Ingest/Query）
 
-
-
     '''Service-- 对应 业务流程, 代码是port(父类的东西), 它的参数是实例化的从西, infra实现的'''
-
+    # 第二步：再实例化 service（IngestService、QueryService），这些service负责实现核心业务逻辑（摄入流程、查询流程），它们依赖第一步实例化的基础组件/适配器来完成工作。
     # 把文档/文本摄入→切块→embedding→写入vector store→抽取图→写入graph store
     ingest_service = IngestService(
         vector_store=vector_store,
@@ -141,6 +147,7 @@ def build_container(settings_override: dict | None = None) -> Dict[str, Any]:
         graph_top_k=settings.graph_top_k,
     )
 
+    # 第三步：把同一个 settings 也挂进 container 里，让service/路由都能访问到配置（比如chunk_size、top_k、后端选择等），这样就实现了全局配置中心的效果。
     # 返回容器字典
     # 把所有实例放入一个dict，后面放到app.state.container中供路由/中间件读取
     return {
@@ -158,14 +165,18 @@ def build_container(settings_override: dict | None = None) -> Dict[str, Any]:
 
 
 def create_app(settings_override: dict | None = None) -> FastAPI:
-    # 构建FastAPI实例并挂载所有东西
-    app = FastAPI(title="GraphRAG", version="0.1.0")
+    settings = build_settings(settings_override) # 2.1 Settings与日志初始化, 通常是配置入口：默认值、环境变量读取（你注释里Day2/Day3暗示后续会从env加载）
 
     # Build DI container
     # app.state是FastAPI提供的全局状态对象（本质上是挂在app实例上的一个容器）
     # 把“DI容器”塞进去，就能在任意请求里通过request.app.state.container拿到服务实例
-    app.state.container = build_container(settings_override)  
+    container = build_container(settings)
 
+    # 构建FastAPI实例并挂载所有东西
+    app = FastAPI(title="GraphRAG", version="0.1.0")
+    app.state.container = container   # 把我们构建好的容器挂到app.state.container里，供后续路由/中间件使用
+    app.state.settings = settings     # 也可以单独挂settings，方便直接访问配置
+    
     # Trace middleware: ensure every request has trace_id (header -> contextvar -> response header)
     # @app.middleware("http")-装饰器:把下面这个函数注册成“HTTP请求的中间件”，以后每次有HTTP请求进来，框架都会按流程自动执行它。
     @app.middleware("http")

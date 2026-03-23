@@ -9,29 +9,39 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
     app_name: str = "graph-rag"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    
     # Retrieval defaults
     vector_top_k: int = Field(default=5, ge=1)  # ge = greater than or equal， 必须是 整数，且 ≥ 1
     graph_top_k: int = Field(default=5, ge=1)
 
-    # 控制文档切块大小, Chunking
+    # chunking
     chunk_size: int = Field(default=400, ge=1)
     chunk_overlap: int = Field(default=50, ge=0)
 
-    # graph_store_backend: "neo4j" | "memory"
-    graph_store_backend: Literal["memory", "neo4j"] = "memory"
-    vector_store_backend: Literal["memory", "sqlite"] = "memory"
+    # backend selectors
 
+    embedding_backend: Literal["sentence_transformer", "fake", "hash"] = "sentence_transformer"   # sentence_transformer | fake | hash
+    vector_store_backend: Literal["memory", "sqlite"] = "memory"    # memory | sqlite
+    graph_store_backend: Literal["memory", "neo4j"] = "memory"      # memory | neo4j
+    llm_backend: Literal["fake", "local", "openai"] = "fake"        # fake | local | openai
+    
+    # embedding
+    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    normalize_embeddings: bool = False
+
+    # sqlite
     sqlite_path: str = ":memory:"
 
+    # neo4j
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_username: str = "neo4j"
     neo4j_password: str = "00000000"
     neo4j_database: str | None = "neo4j"
 
-    llm_backend: Literal["fake", "local", "openai"] = "fake"
+    # openai / local llm
     local_llm_base_url: str = "http://localhost:11434"
     local_llm_model: str = "llama3"
-
+    
     openai_api_key: str | None = None
     openai_model: str = "gpt-5"
     openai_instructions: str = "You are a helpful assistant."
@@ -44,6 +54,7 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
     3. 再做类型校验'''
     @field_validator(
         "log_level",
+        "embedding_backend",
         "graph_store_backend",
         "vector_store_backend",
         "llm_backend",
@@ -54,8 +65,6 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
         if isinstance(v, str):
             return v.strip().lower()
         return v
-
-
 
 
     '''多字段关系校验
@@ -69,6 +78,15 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
 
         if self.vector_store_backend == "sqlite" and not self.sqlite_path:  # 如果你选了 sqlite，就必须提供路径
             raise ValueError("sqlite backend requires sqlite_path")
+
+        if self.graph_store_backend == "neo4j":
+            required = [
+                self.neo4j_uri,
+                self.neo4j_username,
+                self.neo4j_password,
+            ]
+            if not all(required):
+                raise ValueError("neo4j backend requires uri/username/password")
 
         if self.llm_backend == "openai" and not self.openai_api_key:  # 如果你选了 openai，就必须提供 api key
             raise ValueError("openai backend requires openai_api_key")

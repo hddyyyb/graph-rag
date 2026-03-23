@@ -49,6 +49,7 @@ class Neo4jGraphStore(GraphStorePort):
     
     def upsert_chunk_graphs(self, records: List[ChunkGraphRecord]) -> None:
         """
+        👉 作用: 批量写入 chunk → 图
         Upsert chunk-level graph records into Neo4j.
 
         For each record:
@@ -69,15 +70,19 @@ class Neo4jGraphStore(GraphStorePort):
         with self.driver.session(database=self.database) as session:
             for record in records:
                 terms = self._get_terms_from_record(record)
-
-                session.execute_write(
-                    self._upsert_one_record_tx,
-                    {
+                payload = {
                         "chunk_id": record.chunk_id,
                         "doc_id": record.doc_id,
                         "text": record.text,
                         "terms": terms,
-                    },
+                    }
+                # 👉 session.execute_write(...) = Neo4j 事务执行
+                # 👉 execute_write 开启一个写事务
+                # 👉 _upsert_one_record_tx 是 transaction function
+                # 👉 payload 是传给 transaction function 的参数
+                session.execute_write(
+                    self._upsert_one_record_tx,
+                    payload,
                 )
 
     
@@ -91,10 +96,11 @@ class Neo4jGraphStore(GraphStorePort):
         if not query or top_k <= 0:
             return []
 
-        terms = extract_terms(query)
+        terms = extract_terms(query)  # Step1: 提取 query terms
         if not terms:
             return []
 
+        # Step2: session.execute_read 调用查询事务
         with self.driver.session(database=self.database) as session:
             rows = session.execute_read(
                 self._search_chunks_by_terms_tx,
@@ -104,6 +110,7 @@ class Neo4jGraphStore(GraphStorePort):
                 },
                 )
 
+        # Step3: 转成返回对象
         results: list[RetrievedChunk] = []
         for row in rows:
             results.append(
@@ -114,7 +121,7 @@ class Neo4jGraphStore(GraphStorePort):
                     score=float(row["score"]),
                     source="graph",
                 )
-            )
+            )  # ✔ source="graph", 是 multi-retrieval 的来源标记
         return results
 
 
@@ -133,6 +140,10 @@ class Neo4jGraphStore(GraphStorePort):
     def _ensure_schema(self) -> None:
         """
         Create minimal constraints for Neo4j graph storage.
+        建 schema(非常重要)
+        含义: Chunk 唯一, Term 唯一 
+        因为后面 MERGE (c:Chunk {chunk_id: ...})
+        没有唯一约束会重复建节点 
         """
         statements = [
             """
@@ -154,8 +165,15 @@ class Neo4jGraphStore(GraphStorePort):
     # internal tx functions
     # -------------------------------------------------------------------------
     
+
+    # transaction function（事务函数）: 在数据库事务里执行的一段函数
     @staticmethod
     def _upsert_one_record_tx(tx, payload: dict[str, Any]) -> None:
+        '''
+        transaction function 第一个参数一定是 tx
+        代表数据库事务 transaction
+        所有数据库操作都必须通过它: tx.run("Cypher语句")
+        '''
         chunk_id = payload["chunk_id"]
         doc_id = payload["doc_id"]
         text = payload["text"]
@@ -172,6 +190,8 @@ class Neo4jGraphStore(GraphStorePort):
             doc_id=doc_id,
             text=text,
         )
+        # 👉 MERGE = 不存在就创建，存在就复用
+
 
         # 2) upsert term nodes + mentions edges
         for term in terms:
@@ -184,6 +204,7 @@ class Neo4jGraphStore(GraphStorePort):
                 chunk_id=chunk_id,
                 term=term,
             )
+            # 表示: 这个 chunk 提到了这个 term
 
         # 3) upsert co-occurrence edges
         # only create one canonical direction: sorted(term1, term2)
@@ -199,7 +220,11 @@ class Neo4jGraphStore(GraphStorePort):
                 term1=term1,
                 term2=term2,
             )
+            # 两个词经常一起出现 → 强关系
 
+
+    # transaction function（事务函数）: 在数据库事务里执行的一段函数
+    # 查询的事务函数
     @staticmethod
     def _search_chunks_by_terms_tx(tx, payload: dict[str, Any]) -> list[dict[str, Any]]:
         terms: list[str] = payload["terms"]
@@ -220,6 +245,7 @@ class Neo4jGraphStore(GraphStorePort):
             terms=terms,
             top_k=top_k,
         )
+        #  本质: 匹配 query 中多少个 term
 
         return [dict(record) for record in result]
     
@@ -227,7 +253,6 @@ class Neo4jGraphStore(GraphStorePort):
     # -------------------------------------------------------------------------
     # term processing
     # -------------------------------------------------------------------------
-
 
     def _get_terms_from_record(self, record: ChunkGraphRecord) -> list[str]:
         """
@@ -243,7 +268,9 @@ class Neo4jGraphStore(GraphStorePort):
 
         return extract_terms(record.text)
 
+
     def _normalize_terms(self, terms: Iterable[str]) -> list[str]:
+        # lower + strip + 去重
         seen: set[str] = set()
         normalized_terms: list[str] = []
 
