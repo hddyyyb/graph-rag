@@ -59,6 +59,51 @@ It is now a partially functional GraphRAG system with real ingest/query pipeline
 
 ---
 
+### 1.3 Ports Layer (COMPLETED)
+
+The system defines explicit Ports between Application and Infrastructure.
+
+Current ports include:
+
+- EmbeddingProviderPort
+  - embed_texts()
+  - embed_query()
+
+- VectorStorePort
+  - upsert()
+  - search()
+
+- GraphStorePort
+  - upsert_chunk_graphs()
+  - search()
+
+- RetrievalPostProcessorPort
+  - process()
+
+- TracePort
+  - get_trace_id()
+  - set_trace_id()
+  - bind()
+  - event()
+
+- ClockPort
+  - now_iso()
+
+- LLMPort
+  - generate()
+
+- RAGKernelPort
+  - generate_answer()
+
+Design role of Ports:
+
+- decouple QueryService / IngestService from concrete backends
+- keep Application layer independent from SQLite / Neo4j / OpenAI / logging implementations
+- support backend swapping without changing application logic
+- make runtime wiring explicit in the container
+
+---
+
 ### 1.3 Observability (COMPLETED)
 
 - embedding_time
@@ -108,14 +153,25 @@ It is now a partially functional GraphRAG system with real ingest/query pipeline
 - runtime backend selection pattern is already established
 ---
 
-### 1.5 Runtime Wiring (PARTIAL BUT WORKING)
+### 1.5 Runtime Wiring (STABLE ✅)
 
-- container / composition root implemented
-- backend switching already supported for:
-  - llm backend
-  - vector store backend
-- ingest and query services receive dependencies through the same container
-- when vector_store_backend="sqlite", ingest and query already share the same real SQLiteVectorStore instance
+- configuration fully unified via Settings
+- settings_override is only used at app initialization
+- build_container now depends solely on Settings object
+
+- container acts as the single composition root:
+  - embedding / vector / graph / llm all constructed inside container
+  - no direct dict-based config usage
+
+- backend switching is deterministic:
+  - memory / sqlite / neo4j combinations fully supported
+  - no code changes required when switching backend
+
+- ingest and query services share the same backend instances:
+  - same VectorStore instance
+  - same GraphStore instance
+
+- runtime behavior is now testable and validated via wiring tests
 
 ---
 
@@ -138,7 +194,22 @@ It is now a partially functional GraphRAG system with real ingest/query pipeline
   - vector store correctness (SQLite)
   - real integration behavior (embedding + SQLite)
 
+- configuration system tests added:
+  - Settings validation (normalization + cross-field)
+  - default config behavior verification
 
+- container wiring tests added:
+  - backend selection correctness
+  - shared instance verification
+  - deterministic runtime behavior
+
+- create_app tests added:
+  - settings_override propagation
+  - container consistency
+
+Current test status:
+- ~90 tests passing
+- covers config / container / API / integration layers
 ---
 
 ## 2. Reality Check
@@ -150,7 +221,8 @@ This system is:
 ✅ Real embedding available  
 ✅ Real vector store available  
 ✅ Graph backend now supports Neo4j (real backend)
-⚠️ Graph retrieval still basic (term-level, no multi-hop)  
+⚠️ Graph retrieval still basic (term-level, no multi-hop)
+✅ runtime configuration and backend switching now stable and testable
 ✅ Real vector retrieval closed loop validated with dedicated integration tests
 ❌ Not fully production-ready:
    - graph retrieval is not production-grade
@@ -277,7 +349,7 @@ System upgraded from VectorRAG → GraphRAG (minimal version).
 
 ---
 
-### Day25 — Configuration Unification & Runtime Stability
+### Day25 — Configuration Unification & Runtime Stability (COMPLETED ✅)
 
 Objective:
 Stabilize runtime configuration and ensure clean backend switching.
@@ -308,7 +380,10 @@ Deliverable:
 - clean configuration system
 - deterministic runtime behavior
 - improved engineering consistency
-
+- unified configuration system (Settings as single source of truth)
+- container refactored into clean composition root
+- deterministic backend switching verified via tests
+- system upgraded from "working" to "engineering-stable"
 ---
 
 ### Day26 — Neo4j Graph End-to-End Validation
