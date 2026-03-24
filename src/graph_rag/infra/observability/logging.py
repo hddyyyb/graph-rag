@@ -14,6 +14,8 @@ _bound_fields_var: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextV
     "bound_fields", default={}
 )  # 每个请求独立存系统里想追踪的上下文：比如doc_id、user_id、query、tenant等
 
+from pathlib import Path
+
 
 class SimpleTrace(TracePort):
     def __init__(self, clock: ClockPort):
@@ -53,20 +55,26 @@ def setup_logging(level: str = "INFO") -> None:
     logger = logging.getLogger("graph_rag")
     logger.setLevel(level.upper())
 
-    handler = logging.StreamHandler(sys.stdout)
+    Path("logs").mkdir(exist_ok=True)
+
     fmt = logging.Formatter(
         fmt="%(asctime)s %(levelname)s trace_id=%(trace_id)s %(message)s"
     )
-    handler.setFormatter(fmt)
 
     class TraceIdFilter(logging.Filter):
         def filter(self, record: logging.LogRecord) -> bool:
             record.trace_id = _trace_id_var.get() or "-"
             return True
 
-    handler.addFilter(TraceIdFilter())
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(fmt)
+    console_handler.addFilter(TraceIdFilter())
 
-    # avoid duplicate handlers under reload
+    file_handler = logging.FileHandler("logs/app.log", encoding="utf-8")
+    file_handler.setFormatter(fmt)
+    file_handler.addFilter(TraceIdFilter())
+
     logger.handlers = []
-    logger.addHandler(handler)
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
     logger.propagate = False

@@ -18,10 +18,7 @@ def test_graph_retrieval_closed_loop_with_graph_only():
     vector_store = InMemoryVectorStore()
     graph_store = InMemoryGraphStore()
 
-    embedder = SentenceTransformerEmbeddingProvider(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        normalize_embeddings=True,
-    )
+    embedder = SentenceTransformerEmbeddingProvider()
 
     kernel = FakeKernel()
     trace = FakeTrace()

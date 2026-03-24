@@ -143,9 +143,26 @@ Design role of Ports:
   - memory / neo4j
 - graph-only retrieval closed loop verified via API integration tests
 
+#### Graph Retrieval (UPDATED — V2)
+
+Graph retrieval has been upgraded from direct term matching to a structure-aware retrieval strategy.
+
+Implemented capabilities:
+
+- 1-hop term expansion over `CO_OCCURS_WITH`
+- dual-channel retrieval:
+  - direct term hits
+  - expanded term hits
+- weighted graph scoring:
+  - direct hit = 1.0
+  - expanded hit = 0.5
+- chunk-level aggregation with deduplicated term sets
+- consistent behavior across memory / Neo4j backends
+
 ⚠️ Current limitations:
-- no multi-hop traversal
-- no advanced graph scoring
+- no multi-hop traversal (>1 hop)
+- edge weights not used in scoring
+- no path-based reasoning
 - no entity-level modeling (term-based only)
 
 #### LLM
@@ -221,7 +238,9 @@ This system is:
 ✅ Real embedding available  
 ✅ Real vector store available  
 ✅ Graph backend now supports Neo4j (real backend)
-⚠️ Graph retrieval still basic (term-level, no multi-hop)
+⚠️ Graph retrieval upgraded to structure-aware (1-hop expansion), but still not production-grade:
+   - no multi-hop reasoning
+   - no edge-weight-aware scoring
 ✅ runtime configuration and backend switching now stable and testable
 ✅ Real vector retrieval closed loop validated with dedicated integration tests
 ❌ Not fully production-ready:
@@ -232,14 +251,20 @@ This system is:
 
 ## 3. Core Gaps
 
-### 3.1 Graph Retrieval Still Basic
+### 3.1 Graph Retrieval Not Yet Production-Grade
+
 - Neo4jGraphStore implemented
 - graph schema is minimal (Chunk / Term)
 - retrieval is term-overlap based
-- no:
+
+- Graph Retrieval V2 implemented:
+  - 1-hop term expansion
+  - weighted scoring
+- still missing:
   - multi-hop traversal
-  - path-based reasoning
-  - graph-aware ranking
+  - edge-weight-aware ranking
+  - path reasoning
+  - entity-level graph modeling
 
 ### 3.2 Ingest Pipeline Still Minimal
 - no entity extraction
@@ -386,33 +411,36 @@ Deliverable:
 - system upgraded from "working" to "engineering-stable"
 ---
 
-### Day26 — Neo4j Graph End-to-End Validation
+### Day26 — Graph Retrieval V2 Upgrade (COMPLETED ✅)
 
 Objective:
-Ensure Neo4j backend is fully functional and consistent with existing behavior.
+Upgrade graph retrieval from term-level matching to structure-aware retrieval.
 
 Tasks:
 
-- Write tests:
-  - Neo4jGraphStore upsert + search
-  - ingest → Neo4j write verification
-  - query(enable_graph=True) → Neo4j retrieval
+- introduce 1-hop term expansion over CO_OCCURS_WITH
+- implement dual-channel retrieval:
+  - direct term hits
+  - expanded term hits
+- design graph-aware scoring:
+  - direct hit weight = 1.0
+  - expanded hit weight = 0.5
+- implement chunk-level aggregation and ranking
+- unify behavior across:
+  - InMemoryGraphStore
+  - Neo4jGraphStore
 
-- Cross-backend comparison:
-  - memory graph vs neo4j graph (same input → similar output)
+Validation:
 
-- Validate:
-  - graph-only retrieval path
-  - correctness of scoring and top_k
-
-- Add observability:
-  - trace graph_hit_count
-  - trace neo4j query timing
+- expansion recall test (1-hop reachability)
+- direct vs expanded ranking test
+- cross-backend consistency verification
 
 Deliverable:
 
-- Verified Neo4j graph retrieval pipeline
-- No regression vs InMemoryGraphStore
+- Graph Retrieval V2 fully implemented
+- structure-aware graph retrieval enabled
+- test suite extended (96 tests passing)
 
 ---
 

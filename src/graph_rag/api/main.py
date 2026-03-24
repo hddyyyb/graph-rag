@@ -45,7 +45,13 @@ def build_graph_store(settings: Settings):
     backend = settings.graph_store_backend.lower()
 
     if backend == "memory":
-        return InMemoryGraphStore()
+        graph_store = InMemoryGraphStore(
+            expand_per_term_limit=settings.graph_expand_per_term_limit,
+            direct_hit_weight=settings.graph_direct_hit_weight,
+            expanded_hit_weight=settings.graph_expanded_hit_weight,
+            max_expanded_terms=settings.graph_max_expanded_terms,
+        )
+        return graph_store
 
     if backend == "neo4j":
         driver = GraphDatabase.driver(
@@ -56,6 +62,10 @@ def build_graph_store(settings: Settings):
             driver=driver,
             database=settings.neo4j_database,
             ensure_schema_on_init=True,
+            expand_per_term_limit=settings.graph_expand_per_term_limit,
+            direct_hit_weight=settings.graph_direct_hit_weight,
+            expanded_hit_weight=settings.graph_expanded_hit_weight,
+            max_expanded_terms=settings.graph_max_expanded_terms,
         )
 
     raise ValueError(f"Unsupported graph_store_backend: {settings.graph_store_backend}")
@@ -113,7 +123,9 @@ def build_container(settings: Settings) -> Dict[str, Any]:
     
     embedding_backend = settings.embedding_backend
     if embedding_backend == 'sentence_transformer':
-        embedder = SentenceTransformerEmbeddingProvider()
+        embedder = SentenceTransformerEmbeddingProvider(
+            model_name_or_path=settings.embedding_model_name_or_path,
+            )
     elif embedding_backend == 'hash':
         embedder = HashEmbeddingProvider(dim=32)
     elif embedding_backend == 'fake':

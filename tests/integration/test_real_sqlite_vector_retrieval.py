@@ -22,7 +22,7 @@ def test_real_sqlite_vector_only_closed_loop(tmp_path):
 
     # 3) real embedding
     embedder = SentenceTransformerEmbeddingProvider(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_name_or_path="sentence-transformers/all-MiniLM-L6-v2",
         normalize_embeddings=True,
     )
 
@@ -93,7 +93,7 @@ def test_real_sqlite_vector_top_k_closed_loop(tmp_path):
     graph_store = InMemoryGraphStore()
 
     embedder = SentenceTransformerEmbeddingProvider(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_name_or_path="sentence-transformers/all-MiniLM-L6-v2",
         normalize_embeddings=True,
     )
 
@@ -161,7 +161,7 @@ def test_real_sqlite_vector_min_score_closed_loop(tmp_path):
     graph_store = InMemoryGraphStore()
 
     embedder = SentenceTransformerEmbeddingProvider(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_name_or_path="sentence-transformers/all-MiniLM-L6-v2",
         normalize_embeddings=True,
     )
 

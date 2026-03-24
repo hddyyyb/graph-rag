@@ -21,16 +21,24 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
     # backend selectors
 
     embedding_backend: Literal["sentence_transformer", "fake", "hash"] = "sentence_transformer"   # sentence_transformer | fake | hash
-    vector_store_backend: Literal["memory", "sqlite"] = "memory"    # memory | sqlite
-    graph_store_backend: Literal["memory", "neo4j"] = "memory"      # memory | neo4j
+    vector_store_backend: Literal["memory", "sqlite"] = "sqlite"    # memory | sqlite
+    graph_store_backend: Literal["memory", "neo4j"] = "neo4j"      # memory | neo4j
     llm_backend: Literal["fake", "local", "openai"] = "fake"        # fake | local | openai
     
     # embedding
-    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    #embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_model_name_or_path: str = r"E:/Reasarch/hf_models/all-MiniLM-L6-v2"
     normalize_embeddings: bool = False
 
     # sqlite
     sqlite_path: str = ":memory:"
+
+    # 把Graph Retrieval V2也纳入统一配置系统
+    graph_expand_hops: int = 1
+    graph_expand_per_term_limit: int = Field(default=2, ge=1)  # ≥ 1, 每个 query term 最多扩展多少个“相关 term”
+    graph_direct_hit_weight: float = Field(default=1.0, gt=0)  # > 0, 原始 query term 命中的权重
+    graph_expanded_hit_weight: float = Field(default=0.5, ge=0)  # 可以为0, 图扩展 term 命中的权重
+    graph_max_expanded_terms: int = Field(default=10, ge=1)     # ≥ 1, 最多扩展多少个 term
 
     # neo4j
     neo4j_uri: str = "bolt://localhost:7687"
@@ -90,6 +98,9 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
 
         if self.llm_backend == "openai" and not self.openai_api_key:  # 如果你选了 openai，就必须提供 api key
             raise ValueError("openai backend requires openai_api_key")
+        
+        if self.graph_expanded_hit_weight > self.graph_direct_hit_weight:
+            raise ValueError("graph_expanded_hit_weight should not exceed graph_direct_hit_weight")
 
         return self
     '''

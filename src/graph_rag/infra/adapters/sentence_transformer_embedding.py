@@ -10,10 +10,10 @@ class SentenceTransformerEmbeddingProvider(EmbeddingProviderPort):
 
     def __init__(
             self,
-            model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+            model_name_or_path: str = r"E:/Reasarch/hf_models/all-MiniLM-L6-v2",
             normalize_embeddings: bool = False
             ) -> None:
-        self.model = SentenceTransformer(model_name)
+        self.model = SentenceTransformer(model_name_or_path)
         self.normalize_embeddings = normalize_embeddings
 
     def embed_texts(self, texts: List[str]) -> List[List[float]]:

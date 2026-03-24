@@ -56,3 +56,18 @@ def test_settings_invalid_vector_backend_raises():
         Settings(vector_store_backend="abc")
 
 
+def test_settings_graph_retrieval_v2_defaults():
+    settings = Settings()
+
+    assert settings.graph_expand_per_term_limit == 2
+    assert settings.graph_direct_hit_weight == 1.0
+    assert settings.graph_expanded_hit_weight == 0.5
+    assert settings.graph_max_expanded_terms == 10
+
+
+def test_settings_rejects_expanded_weight_greater_than_direct_weight():
+    with pytest.raises(ValueError):
+        Settings(
+            graph_direct_hit_weight=0.5,
+            graph_expanded_hit_weight=1.0,
+        )

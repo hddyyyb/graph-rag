@@ -160,12 +160,14 @@ docker compose up -d
 ### 3. Start API
 
 ```bash
+docker start neo4j-local
 uvicorn graph_rag.api.main:app --reload --port 8000
 ```
 
 ### 4. Open Docs
 
 ```bash
+
 http://localhost:8000/docs
 ```
 

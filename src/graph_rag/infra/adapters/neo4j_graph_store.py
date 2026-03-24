@@ -1,31 +1,25 @@
 from __future__ import annotations
 
-from email.mime import text
 from itertools import combinations
-from typing import Iterable, List, Sequence, Any
+from typing import Iterable, List, Any
 
 from neo4j import Driver
 
 from graph_rag.domain.models import RetrievedChunk
 from graph_rag.domain.graph_models import ChunkGraphRecord
-
 from graph_rag.ports.graph_store import GraphStorePort
-
 from graph_rag.common.text_utils import extract_terms
 
 
 class Neo4jGraphStore(GraphStorePort):
     """
-    Minimal Neo4j-backed GraphStore implementation.
+    Neo4j-backed GraphStore implementation.
 
-    Current responsibilities:
     - store chunk nodes
     - store term nodes
     - store Chunk -> Term mentions relations
     - store Term -> Term co-occurrence relations
     - search chunks by query-term matching
-
-    Intentionally out of scope for Day24:
     - multi-hop graph reasoning
     - entity extraction pipeline
     - graph/vector fusion optimization
@@ -36,20 +30,57 @@ class Neo4jGraphStore(GraphStorePort):
         driver: Driver,
         database: str | None = None,
         ensure_schema_on_init: bool = True,
+        expand_per_term_limit: int = 2,
+        direct_hit_weight: float = 1.0,
+        expanded_hit_weight: float = 0.5,
+        max_expanded_terms: int = 10,
     ) -> None:
+        
         self.driver = driver
         self.database = database
+        self.expand_per_term_limit = expand_per_term_limit
+        self.direct_hit_weight = direct_hit_weight
+        self.expanded_hit_weight = expanded_hit_weight
+        self.max_expanded_terms = max_expanded_terms
 
         if ensure_schema_on_init:
             self._ensure_schema()
+    
+    
+    # -------------------------------------------------------------------------
+    # schema
+    # -------------------------------------------------------------------------
 
+    def _ensure_schema(self) -> None:
+        """
+        Create minimal constraints for Neo4j graph storage.
+        建 schema(非常重要)
+        含义: Chunk 唯一, Term 唯一 
+        因为后面 MERGE (c:Chunk {chunk_id: ...})
+        没有唯一约束会重复建节点 
+        """
+        statements = [
+            """
+            CREATE CONSTRAINT chunk_id_unique IF NOT EXISTS
+            FOR (c:Chunk) REQUIRE c.chunk_id IS UNIQUE
+            """,
+            """
+            CREATE CONSTRAINT term_name_unique IF NOT EXISTS
+            FOR (t:Term) REQUIRE t.name IS UNIQUE
+            """,
+        ]
+
+        with self.driver.session(database=self.database) as session:
+            for stmt in statements:
+                session.run(stmt)
+
+                
     # -------------------------------------------------------------------------
     # public api
     # -------------------------------------------------------------------------
     
     def upsert_chunk_graphs(self, records: List[ChunkGraphRecord]) -> None:
         """
-        👉 作用: 批量写入 chunk → 图
         Upsert chunk-level graph records into Neo4j.
 
         For each record:
@@ -76,10 +107,10 @@ class Neo4jGraphStore(GraphStorePort):
                         "text": record.text,
                         "terms": terms,
                     }
-                # 👉 session.execute_write(...) = Neo4j 事务执行
-                # 👉 execute_write 开启一个写事务
-                # 👉 _upsert_one_record_tx 是 transaction function
-                # 👉 payload 是传给 transaction function 的参数
+                # session.execute_write(...) = Neo4j 事务执行
+                # execute_write 开启一个写事务
+                # _upsert_one_record_tx 是 transaction function
+                # payload 是传给 transaction function 的参数
                 session.execute_write(
                     self._upsert_one_record_tx,
                     payload,
@@ -89,40 +120,37 @@ class Neo4jGraphStore(GraphStorePort):
     def search(self, query: str, top_k: int) -> List[RetrievedChunk]:
         """
         Search relevant chunks by matching extracted query terms against graph terms.
-
-        Ranking strategy for Day24:
         - count how many distinct query terms hit each chunk
         """      
         if not query or top_k <= 0:
             return []
 
-        terms = extract_terms(query)  # Step1: 提取 query terms
-        if not terms:
+        direct_terms  = extract_terms(query)
+        if not direct_terms:
             return []
 
-        # Step2: session.execute_read 调用查询事务
+        expanded_terms = self._expand_terms(direct_terms)
+
+        # session.execute_read 调用查询事务
         with self.driver.session(database=self.database) as session:
-            rows = session.execute_read(
-                self._search_chunks_by_terms_tx,
-                {
-                    "terms": terms,
-                    "top_k": top_k,
-                },
+            direct_rows = session.execute_read(
+                self._search_direct_hits_tx,
+                {"terms": direct_terms},
+                )
+            
+            expanded_rows: list[dict[str, Any]] = []
+            if expanded_terms:
+                expanded_rows = session.execute_read(
+                    self._search_expanded_hits_tx,
+                    {"terms": expanded_terms},
                 )
 
-        # Step3: 转成返回对象
-        results: list[RetrievedChunk] = []
-        for row in rows:
-            results.append(
-                RetrievedChunk(
-                    chunk_id=row["chunk_id"],
-                    doc_id=row["doc_id"],
-                    text=row["text"],
-                    score=float(row["score"]),
-                    source="graph",
-                )
-            )  # ✔ source="graph", 是 multi-retrieval 的来源标记
-        return results
+        # 转成返回对象
+        return self._merge_rank_results(
+            direct_rows = direct_rows,
+            expanded_rows = expanded_rows,
+            top_k = top_k
+        )
 
 
     def close(self) -> None:
@@ -133,39 +161,9 @@ class Neo4jGraphStore(GraphStorePort):
 
 
     # -------------------------------------------------------------------------
-    # schema
-    # -------------------------------------------------------------------------
-
-
-    def _ensure_schema(self) -> None:
-        """
-        Create minimal constraints for Neo4j graph storage.
-        建 schema(非常重要)
-        含义: Chunk 唯一, Term 唯一 
-        因为后面 MERGE (c:Chunk {chunk_id: ...})
-        没有唯一约束会重复建节点 
-        """
-        statements = [
-            """
-            CREATE CONSTRAINT chunk_id_unique IF NOT EXISTS
-            FOR (c:Chunk) REQUIRE c.chunk_id IS UNIQUE
-            """,
-            """
-            CREATE CONSTRAINT term_name_unique IF NOT EXISTS
-            FOR (t:Term) REQUIRE t.name IS UNIQUE
-            """,
-        ]
-
-        with self.driver.session(database=self.database) as session:
-            for stmt in statements:
-                session.run(stmt)
-    
-
-    # -------------------------------------------------------------------------
     # internal tx functions
     # -------------------------------------------------------------------------
     
-
     # transaction function（事务函数）: 在数据库事务里执行的一段函数
     @staticmethod
     def _upsert_one_record_tx(tx, payload: dict[str, Any]) -> None:
@@ -179,7 +177,7 @@ class Neo4jGraphStore(GraphStorePort):
         text = payload["text"]
         terms: list[str] = payload["terms"]
 
-        # 1) upsert chunk node
+        # 1) upsert chunk node,  MERGE = 不存在就创建，存在就复用
         tx.run(
             """
             MERGE (c:Chunk {chunk_id: $chunk_id})
@@ -190,7 +188,6 @@ class Neo4jGraphStore(GraphStorePort):
             doc_id=doc_id,
             text=text,
         )
-        # 👉 MERGE = 不存在就创建，存在就复用
 
 
         # 2) upsert term nodes + mentions edges
@@ -228,7 +225,6 @@ class Neo4jGraphStore(GraphStorePort):
     @staticmethod
     def _search_chunks_by_terms_tx(tx, payload: dict[str, Any]) -> list[dict[str, Any]]:
         terms: list[str] = payload["terms"]
-        top_k: int = payload["top_k"]
 
         result = tx.run(
             """
@@ -236,23 +232,172 @@ class Neo4jGraphStore(GraphStorePort):
             WHERE t.name IN $terms
             WITH c, count(DISTINCT t) AS score
             ORDER BY score DESC, c.chunk_id ASC
-            LIMIT $top_k
             RETURN c.chunk_id AS chunk_id,
                    c.doc_id AS doc_id,
                    c.text AS text,
                    score AS score
             """,
             terms=terms,
-            top_k=top_k,
         )
         #  本质: 匹配 query 中多少个 term
 
         return [dict(record) for record in result]
     
 
+    @staticmethod
+    def _expand_terms_tx(tx, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        '''
+        输入 terms, per_term_limit
+        输出 每个direct term扩展出来的候选term
+        Python返回建议: 返回原始rows即可,后面Python拍平
+        '''
+        terms = payload["terms"]
+        per_term_limit = payload["per_term_limit"]
+        result = tx.run(
+            """
+            UNWIND $terms AS qterm
+            MATCH (t1:Term {name: qterm})-[r:CO_OCCURS_WITH]-(t2:Term)
+            WHERE NOT t2.name IN $terms
+            WITH qterm, t2.name AS expanded_term, r.weight AS weight
+            ORDER BY qterm, weight DESC, expanded_term ASC
+            WITH qterm, collect({term: expanded_term, weight: weight}) AS candidates
+            RETURN qterm, candidates[..$per_term_limit] AS expanded
+            """,
+            terms=terms,
+            per_term_limit=per_term_limit,
+        )
+        return [dict(record) for record in result]
+        # result 是 neo4j 的结果对象，不能直接用，转成 list[dict] 方便后续处理
+        # result 的结构是:
+        # [
+        #   {
+        #     "qterm": "term1",
+        #     "expanded": [
+        #       {"term": "expanded_term1", "weight": 5},
+        #       {"term": "expanded_term2", "weight": 3},
+        #     ]
+        #   },
+        #   {
+        #     "qterm": "term2",
+        #     "expanded": [
+        #       {"term": "expanded_term3", "weight": 4},
+        #     ]
+        #   },
+        # ]
+
+
+    @staticmethod
+    def _search_direct_hits_tx(tx, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        '''
+        输入: terms
+        输出: 每个term命中的chunk列表
+        '''
+        terms = payload["terms"]
+        result = tx.run(
+            """
+            MATCH (c:Chunk)-[:MENTIONS]->(t:Term)
+            WHERE t.name IN $terms
+            WITH c, collect(DISTINCT t.name) AS hit_terms
+            RETURN c.chunk_id AS chunk_id,
+                c.doc_id AS doc_id,
+                c.text AS text,
+                hit_terms AS hit_terms
+            """,
+            terms=terms,
+        )
+        return [dict(record) for record in result]
+
+
+    @staticmethod
+    def _search_expanded_hits_tx(tx, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        terms = payload["terms"]
+        result = tx.run(
+            """
+            MATCH (c:Chunk)-[:MENTIONS]->(t:Term)
+            WHERE t.name IN $terms
+            WITH c, collect(DISTINCT t.name) AS hit_terms
+            RETURN c.chunk_id AS chunk_id,
+                c.doc_id AS doc_id,
+                c.text AS text,
+                hit_terms AS hit_terms
+            """,
+            terms=terms,
+        )
+        return [dict(record) for record in result]
+    
+
     # -------------------------------------------------------------------------
     # term processing
     # -------------------------------------------------------------------------
+
+    def _merge_rank_results(
+        self,
+        direct_rows: list[dict[str, Any]],
+        expanded_rows: list[dict[str, Any]],
+        top_k: int,
+    ) -> list[RetrievedChunk]:
+        merged: dict[str, dict[str, Any]] = {}
+        # direct_rows 是 dict list，每个 dict 代表一个 chunk，
+        # 包含 chunk_id, doc_id, text, hit_terms（命中的 query term 列表）
+        # ["chunk_id": ..., "doc_id": ..., "text": ..., "hit_terms": [...]], ...]
+        # hit_terms 的 来源是: WITH c, collect(DISTINCT t.name) AS hit_terms 
+        # 就是指 chunk c 命中了哪些 term, 而 collect 是把命中的 term 聚合成一个列表
+
+        # 1. 聚合 direct hits 和 expanded hits
+        for row in direct_rows:
+            chunk_id = row["chunk_id"]
+            merged.setdefault(
+                chunk_id,
+                {
+                    "chunk_id": chunk_id,
+                    "doc_id": row["doc_id"],
+                    "text": row["text"],
+                    "direct_terms": set(),
+                    "expanded_terms": set(),
+                },
+            )
+            merged[chunk_id]["direct_terms"].update(row.get("hit_terms", []))
+        
+        for row in expanded_rows:
+            chunk_id = row["chunk_id"]
+            merged.setdefault(
+                chunk_id,
+                {
+                    "chunk_id": chunk_id,
+                    "doc_id": row["doc_id"],
+                    "text": row["text"],
+                    "direct_terms": set(),
+                    "expanded_terms": set(),
+                },
+            )
+            merged[chunk_id]["expanded_terms"].update(row.get("hit_terms", []))
+
+        # 2. 计算分数并构建 RetrievedChunk 列表
+        scored_chunks: list[RetrievedChunk] = []
+
+        for item in merged.values():
+            direct_count = len(item["direct_terms"])
+            expanded_count = len(item["expanded_terms"])
+
+            score = (
+                self.direct_hit_weight * direct_count
+                + self.expanded_hit_weight * expanded_count
+            )
+
+            scored_chunks.append(
+                RetrievedChunk(
+                    chunk_id=item["chunk_id"],
+                    doc_id=item["doc_id"],
+                    text=item["text"],
+                    score=score,
+                    source="graph",
+                )
+            )
+
+        scored_chunks.sort(key=lambda x: (-x.score, x.chunk_id))
+        return scored_chunks[:top_k]
+
+
 
     def _get_terms_from_record(self, record: ChunkGraphRecord) -> list[str]:
         """
@@ -267,6 +412,38 @@ class Neo4jGraphStore(GraphStorePort):
             return self._normalize_terms(raw_terms)
 
         return extract_terms(record.text)
+
+
+    def _expand_terms(self, direct_terms: list[str]) -> list[str]:
+        '''
+        包装事务调用, 并把Cypher结果拍平成最终expanded term list。
+        '''
+
+        if not direct_terms:
+            return []
+        with self.driver.session(database=self.database) as session:
+            rows = session.execute_read(
+                self._expand_terms_tx,
+                {
+                    "terms": direct_terms,
+                    "per_term_limit": self.expand_per_term_limit,
+                },
+            )
+        expanded_terms = []
+        seen = set(direct_terms)
+
+        for row in rows:
+            for candidate in row.get("expanded", []):
+                term = candidate["term"]
+                if term in seen:
+                    continue
+                seen.add(term)
+                expanded_terms.append(term)
+
+                if len(expanded_terms) >= self.max_expanded_terms:
+                    return expanded_terms
+                
+        return expanded_terms
 
 
     def _normalize_terms(self, terms: Iterable[str]) -> list[str]:

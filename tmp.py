@@ -1,16 +1,7 @@
-from neo4j import GraphDatabase
+from sentence_transformers import SentenceTransformer
 
-driver = GraphDatabase.driver(
-    "bolt://localhost:7687",
-    auth=("neo4j", "00000000")
-)
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
-with driver.session(database="system") as session:
-    result = session.run("SHOW DATABASES")
+print(model)
 
-    for record in result:
-        print({
-            "name": record["name"],
-            "currentStatus": record["currentStatus"],
-            "default": record["default"],
-        })
+print(model._first_module().auto_model.name_or_path)
