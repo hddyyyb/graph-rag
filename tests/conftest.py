@@ -7,6 +7,12 @@ import pytest
 from dotenv import load_dotenv
 
 load_dotenv()
+# tests/conftest.py
+
+import pytest
+from fastapi.testclient import TestClient
+from graph_rag.api.main import create_app
+
 
 # -----------------------------------------------------------------------------
 # environment helpers
@@ -15,6 +21,37 @@ load_dotenv()
 # -----------------------------------------------------------------------------
 # fixtures
 # -----------------------------------------------------------------------------
+import pytest
+
+from graph_rag.infra.adapters import InMemoryGraphStore, Neo4jGraphStore
+
+
+@pytest.fixture
+def client():
+    app = create_app()
+    return TestClient(app)
+
+
+@pytest.fixture
+def memory_store():
+    return InMemoryGraphStore(
+        expand_per_term_limit=2,
+        direct_hit_weight=1.0,
+        expanded_hit_weight=0.5,
+    )
+
+
+@pytest.fixture
+def neo4j_store(neo4j_driver, neo4j_config, clean_graph):
+    return Neo4jGraphStore(
+        driver=neo4j_driver,
+        database=neo4j_config["neo4j_database"],
+        expand_per_term_limit=2,
+        direct_hit_weight=1.0,
+        expanded_hit_weight=0.5,
+    )
+
+
 
 @pytest.fixture
 def neo4j_driver():

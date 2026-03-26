@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass 
 from typing import Any, Dict, List, Optional
 
+from graph_rag.domain.models import RetrievedChunk
+
 
 @dataclass(frozen=True)
 class GraphNode:
@@ -26,3 +28,4 @@ class ChunkGraphRecord:
     doc_id: str
     text: str
     terms: List[str] = None    # 表明抽取工作已经在GraphStore外面完成了
+

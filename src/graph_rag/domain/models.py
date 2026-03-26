@@ -37,6 +37,10 @@ class Answer:    # Returned by QueryService
     citations: Optional[List[Dict[str, Any]]] = None
 
 
+
+
+
+
 '''
 @dataclass等价于手写这种类:
 class IngestResult:

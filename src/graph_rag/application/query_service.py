@@ -91,12 +91,14 @@ class QueryService:
         List[RetrievedChunk], 
         List[RetrievedChunk], 
         List[RetrievedChunk], 
+        Optional[Dict[str, Any]],
         Dict[str, float],
         ]:
 
         chunks: List[RetrievedChunk] = []
         vector_chunks: List[RetrievedChunk] = []
         graph_chunks: List[RetrievedChunk] = []
+        graph_debug: Optional[Dict[str, Any]] = None
 
         timings: Dict[str, float] = {
             "vector_retrieval_time": 0.0,
@@ -133,6 +135,7 @@ class QueryService:
                     query = q, 
                     top_k = graph_k
                     )
+                graph_debug = self.graph_store.get_last_debug()
             except Exception as e:
                 self._handle_query_failure(
                     stage="retrieval",
@@ -148,7 +151,7 @@ class QueryService:
                 )
 
 
-        return chunks, vector_chunks, graph_chunks, timings
+        return chunks, vector_chunks, graph_chunks, graph_debug, timings
 
 
     def _build_retrieval_debug(
@@ -158,11 +161,24 @@ class QueryService:
         graph_k: int,
         vector_chunks: List[RetrievedChunk],
         graph_chunks: List[RetrievedChunk],
+        graph_debug: Optional[Dict[str, Any]],
         merged: List[RetrievedChunk],
         timings: Dict[str, float],
         stats: Dict[str, int],
     ) -> Dict[str, Any]:
         
+        graph_payload: Dict[str, Any] = {
+            "top_k": graph_k,
+            "hits": [
+                {"doc_id": c.doc_id, "chunk_id": c.chunk_id, "score": c.score}
+                for c in graph_chunks
+            ],
+        }
+
+        if graph_debug is not None:
+            graph_payload.update(graph_debug)
+
+
         retrieval_debug: Dict[str, Any] = {
             "vector": {
                 "top_k": vector_k,
@@ -171,13 +187,7 @@ class QueryService:
                     for c in vector_chunks
                 ],
             },
-            "graph": {
-                "top_k": graph_k,
-                "hits": [
-                    {"doc_id": c.doc_id, "chunk_id": c.chunk_id, "score": c.score}
-                    for c in graph_chunks
-                ],
-            },
+            "graph": graph_payload,
             "merged": {
                 "count": len(merged),
                 "hits": [
@@ -265,6 +275,7 @@ class QueryService:
         graph_k: int,
         vector_chunks,
         graph_chunks,
+        graph_debug,
         merged,
         timings,
         stats,
@@ -274,6 +285,7 @@ class QueryService:
             graph_k = graph_k,
             vector_chunks = vector_chunks,
             graph_chunks = graph_chunks,
+            graph_debug = graph_debug,
             merged = merged,
             timings = timings,
             stats = stats,
@@ -371,7 +383,7 @@ class QueryService:
 
 
         # perform retrieval
-        chunks, vector_chunks, graph_chunks, retrieval_timings  = self._retrieve_chunks(
+        chunks, vector_chunks, graph_chunks, graph_debug, retrieval_timings  = self._retrieve_chunks(
             q = q,
             qemb = qemb,
             opts = opts,
@@ -409,6 +421,7 @@ class QueryService:
             processed = processed,
             vector_k = vector_k,
             graph_k = graph_k,
+            graph_debug = graph_debug,
             vector_chunks = vector_chunks,
             graph_chunks = graph_chunks,
             merged = merged,

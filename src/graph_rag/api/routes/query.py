@@ -39,8 +39,3 @@ def query(
         retrieval_debug=ans.retrieval_debug,
         citations=ans.citations,
     )
-
-
-'''
-
-'''

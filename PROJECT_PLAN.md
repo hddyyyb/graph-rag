@@ -237,48 +237,61 @@ This system is:
 ✅ Pipeline-complete  
 ✅ Real embedding available  
 ✅ Real vector store available  
-✅ Graph backend now supports Neo4j (real backend)
-⚠️ Graph retrieval upgraded to structure-aware (1-hop expansion), but still not production-grade:
-   - no multi-hop reasoning
-   - no edge-weight-aware scoring
+✅ Real graph backend (Neo4j) integrated
+✅ Graph retrieval supports structure-aware expansion (1-hop)
+
+⚠️ Still not production-grade:
+- no multi-hop reasoning
+- no entity-level graph modeling
+- graph scoring still heuristic-based (not fully weight-driven)
+- no retrieval quality evaluation metrics
+
+⚠️ System-level gaps:
+- no production-grade vector DB (still SQLite)
+- no full dockerized deployment (multi-service)
+
 ✅ runtime configuration and backend switching now stable and testable
 ✅ Real vector retrieval closed loop validated with dedicated integration tests
-❌ Not fully production-ready:
-   - graph retrieval is not production-grade
-   - no persistent graph backend
-   - no multi-hop reasoning
+
 ---
 
 ## 3. Core Gaps
 
-### 3.1 Graph Retrieval Not Yet Production-Grade
+### 3.1 Graph Retrieval Quality
 
-- Neo4jGraphStore implemented
-- graph schema is minimal (Chunk / Term)
-- retrieval is term-overlap based
+Current:
+- term-based + 1-hop expansion
+- heuristic scoring
 
-- Graph Retrieval V2 implemented:
-  - 1-hop term expansion
-  - weighted scoring
-- still missing:
-  - multi-hop traversal
-  - edge-weight-aware ranking
-  - path reasoning
-  - entity-level graph modeling
+Missing:
+- multi-hop reasoning
+- path-aware scoring
+- entity-level modeling
+- graph-based ranking signals
 
-### 3.2 Ingest Pipeline Still Minimal
-- no entity extraction
-- no relation extraction
-- no graph-building pipeline beyond placeholder upsert
+---
 
-### 3.3 Retrieval Validation Still Incomplete
-- SQLite vector path exists, but still needs explicit closed-loop validation:
-  - ingest -> upsert -> search -> query
-- current project needs stronger proof that the real vector backend is the active runtime path in integration scenarios
+### 3.2 Retrieval Evaluation
 
-### 3.4 Deployment Hardening
-- dockerized real backend composition still incomplete
-- production config / persistence / startup flow still needs tightening
+- no offline evaluation dataset
+- no retrieval quality metrics (Recall@K / MRR)
+- no A/B comparison (vector vs graph vs hybrid)
+
+---
+
+### 3.3 Vector Backend Limitation
+
+- SQLite is not scalable
+- no ANN indexing
+- no high-dimensional optimization
+
+---
+
+### 3.4 System Productionization
+
+- no multi-service deployment
+- no container orchestration
+- no persistent storage strategy (graph + vector together)
 
 ---
 
@@ -291,22 +304,23 @@ This system is:
 - add explicit integration tests for real vector closed loop
 - optionally switch SQLite to default local backend after validation
 
-### Phase C: Real GraphRAG (PARTIALLY COMPLETED)
-- Neo4jGraphStore implemented
-- graph ingestion pipeline established
-- graph-only retrieval validated
+### Phase C: Graph Retrieval Evolution (ONGOING)
+- Graph Retrieval V2 (DONE)
+- Next:
+  - weight-aware scoring
+  - multi-hop expansion
+  - entity-level modeling
 
-Next:
+### Phase D: System Productionization (STARTING)
+- dockerized deployment (Neo4j + vector DB)
+- service composition
+- config hardening
+- failure handling
 
-- improve graph scoring
-- introduce entity-level modeling
-- add multi-hop retrieval
-
-### Phase D: API Hardening
-- integrate real backends end-to-end
-- improve validation and failure handling
-- add stronger integration testing
-- docker deployment and local reproducibility
+### Phase E: Retrieval Quality & Evaluation
+- introduce evaluation dataset
+- measure Recall@K / MRR
+- compare vector vs graph vs hybrid
 
 ---
 
@@ -444,7 +458,85 @@ Deliverable:
 
 ---
 
-### Day27–28 — Advanced Vector Store Backend
+### Day27 — Graph Retrieval Observability
+
+Objective:
+Make graph retrieval explainable, debuggable, and observable.
+
+Tasks:
+
+1. Add graph retrieval debug output:
+   - direct_terms
+   - expanded_terms
+   - per-chunk:
+     - direct_hit_count
+     - expanded_hit_count
+     - score
+
+2. Extend GraphStore:
+   - collect debug signals internally
+   - expose debug info to Application layer
+
+3. Integrate into QueryService:
+   - attach graph debug into retrieval_debug["graph"]
+
+4. API output enhancement:
+   - ensure /query returns graph debug info
+
+5. Add tests:
+   - graph debug structure validation
+   - score consistency validation
+   - cross-backend consistency
+
+Deliverable:
+
+- Graph retrieval becomes explainable
+- Debuggable graph scoring pipeline
+- Stronger system observability
+
+---
+### Day28 — Graph Scoring Optimization (NEW)
+
+Objective:
+Enhance graph retrieval quality by introducing edge-weight-aware scoring and improved expansion ranking.
+
+Tasks:
+
+1. Introduce edge-weight-aware scoring:
+   - use CO_OCCURS_WITH.weight in Neo4j
+   - propagate edge weight into expanded term importance
+
+2. Improve expanded term ranking:
+   - rank expanded terms by co-occurrence weight
+   - prioritize stronger semantic connections
+
+3. Refine scoring function:
+   - current:
+     - direct_hit_weight = 1.0
+     - expanded_hit_weight = 0.5
+   - new:
+     - expanded score weighted by edge strength
+     - e.g.:
+       score = direct_count * w1 + Σ(expanded_weight * w2)
+
+4. Align behavior across backends:
+   - Neo4j uses real edge weights
+   - InMemoryGraphStore simulates weights (co-occurrence frequency)
+
+5. Add tests:
+   - edge weight affects ranking
+   - stronger co-occurrence leads to higher rank
+   - regression test (old behavior still valid baseline)
+
+Deliverable:
+
+- Graph scoring upgraded from count-based → weight-aware
+- Better semantic ranking for graph retrieval
+- foundation for multi-hop reasoning
+
+
+
+### Day29 — Advanced Vector Store Backend
 
 Objective:
 Upgrade vector backend from SQLite to a production-grade vector database.
@@ -479,7 +571,7 @@ Deliverable:
 
 ---
 
-### Day29 — End-to-End System Hardening
+### Day30 — End-to-End System Hardening
 
 Objective:
 Stabilize the system for real usage and demos.
@@ -512,7 +604,7 @@ Deliverable:
 
 ---
 
-### Day30 — Final Integration & Production-Ready Packaging
+### Day31 — Final Integration & Production-Ready Packaging
 
 Objective:
 Prepare the project as a production-grade portfolio system.

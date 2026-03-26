@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 from graph_rag.domain.models import RetrievedChunk
 from graph_rag.domain.graph_models import ChunkGraphRecord, GraphNode, GraphEdge
@@ -32,7 +32,7 @@ class InMemoryGraphStore(GraphStorePort):
         self.direct_hit_weight = direct_hit_weight
         self.expanded_hit_weight = expanded_hit_weight
         self.max_expanded_terms = max_expanded_terms
-
+        
         # chunk_id -> RetrievedChunk
         self.chunk_store: Dict[str, RetrievedChunk] = {}
         
@@ -49,6 +49,12 @@ class InMemoryGraphStore(GraphStorePort):
         self.chunk_terms: Dict[str, Set[str]] = {}
         self.doc_to_chunk_ids: Dict[str, Set[str]] = defaultdict(set)
 
+        self._last_debug: Optional[Dict[str, Any]] = None
+    
+
+    def get_last_debug(self) -> Optional[Dict[str, Any]]:
+        return self._last_debug
+    
 
     def upsert_chunk_graphs(self, records: List[ChunkGraphRecord]) -> None:
         for record in records:
@@ -75,19 +81,80 @@ class InMemoryGraphStore(GraphStorePort):
 
 
     def search(self, query: str, top_k: int) -> List[RetrievedChunk]:
-        if not query:
+        self._last_debug = None
+
+        if not query or top_k <= 0:
+            self._last_debug = {
+                "query": query,
+                "direct_terms": [],
+                "expanded_terms": [],
+                "chunks": [],
+            }
             return []
+
         # 提query terms
         direct_terms  = extract_terms(query)
         if not direct_terms :
+            self._last_debug = {
+                "query": query,
+                "direct_terms": [],
+                "expanded_terms": [],
+                "chunks": [],
+            }
             return []
         
         expanded_terms = self._expand_terms(direct_terms)
         direct_hits = self._collect_chunk_hits(direct_terms)  # chunk_id -> 命中 term集合
         expanded_hits = self._collect_chunk_hits(expanded_terms)
-        return self._build_retrieved_chunks(direct_hits, expanded_hits, top_k)
 
-    
+        results = self._build_retrieved_chunks(direct_hits, expanded_hits, top_k)
+        self._last_debug = self._build_debug_payload(
+            query=query,
+            direct_terms=direct_terms,
+            expanded_terms=expanded_terms,
+            direct_hits=direct_hits,
+            expanded_hits=expanded_hits,
+            results=results,
+        )
+        return results
+
+
+    def _build_debug_payload(
+        self,
+        *,
+        query: str,
+        direct_terms: list[str],
+        expanded_terms: list[str],
+        direct_hits: dict[str, set[str]],
+        expanded_hits: dict[str, set[str]],
+        results: list[RetrievedChunk],
+    ) -> dict[str, Any]:
+        chunks_debug: list[dict[str, Any]] = []
+
+        for chunk in results:
+            direct_hit_terms = sorted(direct_hits.get(chunk.chunk_id, set()))
+            expanded_hit_terms = sorted(expanded_hits.get(chunk.chunk_id, set()))
+
+            chunks_debug.append(
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "doc_id": chunk.doc_id,
+                    "direct_terms": direct_hit_terms,
+                    "expanded_terms": expanded_hit_terms,
+                    "direct_hit_count": len(direct_hit_terms),
+                    "expanded_hit_count": len(expanded_hit_terms),
+                    "score": chunk.score,
+                }
+            )
+
+        return {
+            "query": query,
+            "direct_terms": sorted(direct_terms),
+            "expanded_terms": sorted(expanded_terms),
+            "chunks": chunks_debug,
+        }
+
+
     def _index_chunk_terms(self, record: ChunkGraphRecord, terms: List[str]) -> None:
         # 这个函数的作用是把一个chunk的terms信息索引到self.term_to_chunk_ids里，
         # 以便后续检索时快速找到命中某个term的chunk_id集合。

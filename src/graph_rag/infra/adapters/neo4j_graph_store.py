@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from itertools import combinations
-from typing import Iterable, List, Any
+from typing import Dict, Iterable, List, Any, Optional
 
 from neo4j import Driver
 
@@ -42,7 +42,8 @@ class Neo4jGraphStore(GraphStorePort):
         self.direct_hit_weight = direct_hit_weight
         self.expanded_hit_weight = expanded_hit_weight
         self.max_expanded_terms = max_expanded_terms
-
+        self._last_debug: Optional[Dict[str, Any]] = None
+        
         if ensure_schema_on_init:
             self._ensure_schema()
     
@@ -78,7 +79,10 @@ class Neo4jGraphStore(GraphStorePort):
     # -------------------------------------------------------------------------
     # public api
     # -------------------------------------------------------------------------
+    def get_last_debug(self) -> Optional[Dict[str, Any]]:
+        return self._last_debug
     
+
     def upsert_chunk_graphs(self, records: List[ChunkGraphRecord]) -> None:
         """
         Upsert chunk-level graph records into Neo4j.
@@ -122,11 +126,25 @@ class Neo4jGraphStore(GraphStorePort):
         Search relevant chunks by matching extracted query terms against graph terms.
         - count how many distinct query terms hit each chunk
         """      
+        self._last_debug = None
+
         if not query or top_k <= 0:
+            self._last_debug = {
+                "query": query,
+                "direct_terms": [],
+                "expanded_terms": [],
+                "chunks": [],
+            }
             return []
 
         direct_terms  = extract_terms(query)
         if not direct_terms:
+            self._last_debug = {
+                "query": query,
+                "direct_terms": [],
+                "expanded_terms": [],
+                "chunks": [],
+            }
             return []
 
         expanded_terms = self._expand_terms(direct_terms)
@@ -145,13 +163,68 @@ class Neo4jGraphStore(GraphStorePort):
                     {"terms": expanded_terms},
                 )
 
-        # 转成返回对象
-        return self._merge_rank_results(
+        results = self._merge_rank_results(
             direct_rows = direct_rows,
             expanded_rows = expanded_rows,
             top_k = top_k
         )
 
+        self._last_debug = self._build_debug_payload(
+            query=query,
+            direct_terms=direct_terms,
+            expanded_terms=expanded_terms,
+            direct_rows=direct_rows,
+            expanded_rows=expanded_rows,
+            results=results,
+        )
+
+        return results
+    
+
+    def _build_debug_payload(
+        self,
+        *,
+        query: str,
+        direct_terms: list[str],
+        expanded_terms: list[str],
+        direct_rows: list[dict[str, Any]],
+        expanded_rows: list[dict[str, Any]],
+        results: list[RetrievedChunk],
+    ) -> dict[str, Any]:
+        direct_map: dict[str, set[str]] = {}
+        expanded_map: dict[str, set[str]] = {}
+
+        for row in direct_rows:
+            direct_map[row["chunk_id"]] = set(row.get("hit_terms", []))
+
+        for row in expanded_rows:
+            expanded_map[row["chunk_id"]] = set(row.get("hit_terms", []))
+
+        chunks_debug: list[dict[str, Any]] = []
+
+        for chunk in results:
+            direct_hit_terms = sorted(direct_map.get(chunk.chunk_id, set()))
+            expanded_hit_terms = sorted(expanded_map.get(chunk.chunk_id, set()))
+
+            chunks_debug.append(
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "doc_id": chunk.doc_id,
+                    "direct_terms": direct_hit_terms,
+                    "expanded_terms": expanded_hit_terms,
+                    "direct_hit_count": len(direct_hit_terms),
+                    "expanded_hit_count": len(expanded_hit_terms),
+                    "score": chunk.score,
+                }
+            )
+
+        return {
+            "query": query,
+            "direct_terms": sorted(direct_terms),
+            "expanded_terms": sorted(expanded_terms),
+            "chunks": chunks_debug,
+        }
+    
 
     def close(self) -> None:
         """
