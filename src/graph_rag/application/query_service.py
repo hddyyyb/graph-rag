@@ -31,6 +31,8 @@ class QueryService:
         *,
         vector_top_k: int = 5,
         graph_top_k: int = 5,
+        fusion_alpha: float = 1.0,
+        fusion_beta: float = 1.0,
     ) -> None:
         self.vector_store = vector_store
         self.graph_store = graph_store
@@ -40,8 +42,127 @@ class QueryService:
         self.post_processor = post_processor 
         self.vector_top_k = vector_top_k
         self.graph_top_k = graph_top_k
+        self.fusion_alpha = fusion_alpha
+        self.fusion_beta = fusion_beta
 
 
+
+    @staticmethod
+    def _make_chunk_key(chunk: RetrievedChunk) -> tuple[str, str]:
+        return (chunk.doc_id, chunk.chunk_id)
+
+
+    @staticmethod
+    def _safe_score(chunk: RetrievedChunk) -> float:
+        if chunk.score is None:
+            return 0.0
+        return float(chunk.score)
+
+
+    def _fuse_chunks(
+        self,
+        vector_chunks: list[RetrievedChunk],
+        graph_chunks: list[RetrievedChunk],
+    ) -> tuple[list[RetrievedChunk], dict]:
+        '''
+        fusion时本质上只需要做三件事-
+            合并命中来源
+            合并分数
+            重新构造新对象
+        '''
+        alpha = self.fusion_alpha
+        beta = self.fusion_beta
+
+        merged: dict[tuple[str, str], dict] = {}
+
+        # 1. 先写入vector结果
+        for chunk in vector_chunks:
+            key = self._make_chunk_key(chunk)
+            merged[key] = {
+                "doc_id": chunk.doc_id,
+                "chunk_id": chunk.chunk_id,
+                "text": chunk.text,
+                "vector_hit": True,
+                "graph_hit": False,
+                "vector_score": self._safe_score(chunk),
+                "graph_score": 0.0,
+            }
+
+        # 2. 再合入graph结果
+        for chunk in graph_chunks:
+            key = self._make_chunk_key(chunk)
+            if key not in merged:
+                merged[key] = {
+                    "doc_id": chunk.doc_id,
+                    "chunk_id": chunk.chunk_id,
+                    "text": chunk.text,
+                    "vector_hit": False,
+                    "graph_hit": True,
+                    "vector_score": 0.0,
+                    "graph_score": self._safe_score(chunk),
+                }
+            else:
+                merged[key]["graph_hit"] = True
+                merged[key]["graph_score"] = self._safe_score(chunk)
+
+        fused_chunks: list[RetrievedChunk] = []
+        fusion_debug_chunks: list[dict] = []
+
+        for item in merged.values():
+            vector_hit = item["vector_hit"]
+            graph_hit = item["graph_hit"]
+
+            if vector_hit and graph_hit:
+                source = "hybrid"
+            elif vector_hit:
+                source = "vector"
+            else:
+                source = "graph"
+
+            final_score = alpha * item["vector_score"] + beta * item["graph_score"]
+
+            fused_chunk = RetrievedChunk(
+                doc_id=item["doc_id"],
+                chunk_id=item["chunk_id"],
+                text=item["text"],
+                score=final_score,
+                source=source,
+            )
+            fused_chunks.append(fused_chunk)
+
+            fusion_debug_chunks.append(
+                {
+                    "doc_id": item["doc_id"],
+                    "chunk_id": item["chunk_id"],
+                    "source": source,
+                    "vector_hit": vector_hit,
+                    "graph_hit": graph_hit,
+                    "vector_score": item["vector_score"],
+                    "graph_score": item["graph_score"],
+                    "final_score": final_score,
+                }
+            )
+
+        fused_chunks.sort(key=lambda c: (-c.score, c.chunk_id, c.doc_id))
+        fusion_debug_chunks.sort(
+            key=lambda x: (-x["final_score"], x["chunk_id"], x["doc_id"])
+        )
+
+        fusion_debug = {
+            "alpha": alpha,
+            "beta": beta,
+            "input": {
+                "vector_count": len(vector_chunks),
+                "graph_count": len(graph_chunks),
+            },
+            "output": {
+                "fusion_count": len(fused_chunks),
+            },
+            "chunks": fusion_debug_chunks,
+        }
+
+        return fused_chunks, fusion_debug
+    
 
     def _validate_query(self, query: str) -> str:
         q = (query or "").strip()
@@ -90,12 +211,11 @@ class QueryService:
     ) -> tuple[
         List[RetrievedChunk], 
         List[RetrievedChunk], 
-        List[RetrievedChunk], 
         Optional[Dict[str, Any]],
         Dict[str, float],
         ]:
 
-        chunks: List[RetrievedChunk] = []
+
         vector_chunks: List[RetrievedChunk] = []
         graph_chunks: List[RetrievedChunk] = []
         graph_debug: Optional[Dict[str, Any]] = None
@@ -119,7 +239,6 @@ class QueryService:
                     error = e,
                 )
             timings["vector_retrieval_time"] = time.perf_counter() - start
-            chunks.extend(vector_chunks)
             self.trace.event("vector_retrieved", count = len(vector_chunks))
             self.trace.event(
                 "retrieval_timing",
@@ -142,7 +261,6 @@ class QueryService:
                     error=e,
                 )
             timings["graph_retrieval_time"] = time.perf_counter() - start
-            chunks.extend(graph_chunks)
             self.trace.event("graph_retrieved", count = len(graph_chunks))
             self.trace.event(
                 "retrieval_timing", 
@@ -151,7 +269,7 @@ class QueryService:
                 )
 
 
-        return chunks, vector_chunks, graph_chunks, graph_debug, timings
+        return vector_chunks, graph_chunks, graph_debug, timings
 
 
     def _build_retrieval_debug(
@@ -162,6 +280,7 @@ class QueryService:
         vector_chunks: List[RetrievedChunk],
         graph_chunks: List[RetrievedChunk],
         graph_debug: Optional[Dict[str, Any]],
+        fusion_debug: Dict[str, Any],
         merged: List[RetrievedChunk],
         timings: Dict[str, float],
         stats: Dict[str, int],
@@ -183,11 +302,16 @@ class QueryService:
             "vector": {
                 "top_k": vector_k,
                 "hits": [
-                    {"doc_id": c.doc_id, "chunk_id": c.chunk_id, "score": c.score}
+                    {
+                        "doc_id": c.doc_id, 
+                        "chunk_id": c.chunk_id, 
+                        "score": c.score,
+                        }
                     for c in vector_chunks
                 ],
             },
             "graph": graph_payload,
+            "fusion": fusion_debug,
             "merged": {
                 "count": len(merged),
                 "hits": [
@@ -209,11 +333,11 @@ class QueryService:
     def _postprocess_chunks(
         self,
         *,
-        chunks,
+        chunks: List[RetrievedChunk],
         final_top_k: int,
-        min_score,
-        timings,
-        stats,
+        min_score: Optional[float],
+        timings: Dict[str, float],
+        stats: Dict[str, int],
     ):
         start = time.perf_counter()
         try:
@@ -242,8 +366,8 @@ class QueryService:
         self,
         *,
         query: str,
-        merged,
-        timings,
+        merged: List[RetrievedChunk],
+        timings: Dict[str, float],
     ):
         start = time.perf_counter()
         try:
@@ -276,16 +400,53 @@ class QueryService:
         vector_chunks,
         graph_chunks,
         graph_debug,
+        fusion_debug,
         merged,
         timings,
         stats,
     ):
+        """
+        参数说明:
+        - answer_text: 生成的答案文本
+        - processed: post_processor的输出, 包含最终用于生成答案的chunks和引用信息
+        - vector_k / graph_k: 实际用于检索的top_k参数值
+        - vector_chunks / graph_chunks: 原始的向量检索和图检索结果
+        - graph_debug: 图检索的调试信息(如果有的话)
+        - merged: 最终用于生成答案的chunks列表(经过合并和排序)
+        - timings: 各个阶段的耗时统计
+        - stats: 各种计数统计(如检索到的chunk数量、引用数量等)
+
+        _build_retrieval_debug的作用及与processed的区别:
+        - _build_retrieval_debug负责构建retrieval_debug字典, 包含完整检索调试信息:
+        包括原始vector/graph检索结果、最终merged chunks、以及timings和stats
+        主要用于帮助开发者理解查询流程, 尤其是retrieval阶段的行为
+        - processed是post_processor的直接输出, 是结构化结果:
+        包含最终用于生成答案的chunks和citations
+        - 区别: processed关注"结果", _build_retrieval_debug覆盖"全过程"(retrieval -> postprocess -> stats)
+
+        二者关系:
+        - processed中的chunks对应retrieval_debug中的merged结果
+        - processed中的citations对应stats["citation_count"]的一部分
+        - retrieval_debug额外包含:
+        原始检索结果(vector_chunks / graph_chunks)、graph_debug、timings、stats等全过程信息
+
+        最终Answer对象组成:
+        - answer_text: LLM生成的答案
+        - trace_id: 当前查询的追踪ID
+        - retrieval_debug: 由_build_retrieval_debug构建的完整调试信息
+        - citations: 来自processed中的引用信息
+
+        总结:
+        - processed = 用于生成答案的数据
+        - retrieval_debug = 用于理解系统行为和调试的数据
+        """
         retrieval_debug = self._build_retrieval_debug(
             vector_k = vector_k,
             graph_k = graph_k,
             vector_chunks = vector_chunks,
             graph_chunks = graph_chunks,
             graph_debug = graph_debug,
+            fusion_debug=fusion_debug,
             merged = merged,
             timings = timings,
             stats = stats,
@@ -343,7 +504,7 @@ class QueryService:
         stats: Dict[str, int] = {
             "vector_count" : 0,
             "graph_count" : 0,
-            "merged_count" : 0,
+            "fusion_count" : 0,
             "citation_count" : 0,
         }
         
@@ -383,7 +544,7 @@ class QueryService:
 
 
         # perform retrieval
-        chunks, vector_chunks, graph_chunks, graph_debug, retrieval_timings  = self._retrieve_chunks(
+        vector_chunks, graph_chunks, graph_debug, retrieval_timings  = self._retrieve_chunks(
             q = q,
             qemb = qemb,
             opts = opts,
@@ -394,12 +555,17 @@ class QueryService:
 
         stats["vector_count"] = len(vector_chunks)
         stats["graph_count"] = len(graph_chunks)
-        stats["merged_count"] = len(chunks)
         
+        fused_chunks, fusion_debug = self._fuse_chunks(
+            vector_chunks=vector_chunks,
+            graph_chunks=graph_chunks,
+        )
+
+        stats["fusion_count"] = len(fused_chunks)
 
         # post-processing & postprocess_time
         processed = self._postprocess_chunks(
-            chunks=chunks,
+            chunks=fused_chunks,
             final_top_k=final_top_k,
             min_score=opts.min_score,
             timings=timings,
@@ -422,6 +588,7 @@ class QueryService:
             vector_k = vector_k,
             graph_k = graph_k,
             graph_debug = graph_debug,
+            fusion_debug = fusion_debug,
             vector_chunks = vector_chunks,
             graph_chunks = graph_chunks,
             merged = merged,

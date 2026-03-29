@@ -71,7 +71,7 @@ def test_real_sqlite_vector_only_closed_loop(tmp_path):
 
     # 7) core assertions: real retrieval happened, and source is vector only
     assert len(result.citations) > 0
-    assert all(c["source"] == "sqlite" for c in result.citations)
+    assert all(c["source"] == "vector" for c in result.citations)
 
     # Optional but recommended: the retrieved text/doc should lean to graph doc
     assert any(c.get("doc_id") == "doc_graph" for c in result.citations)
@@ -141,7 +141,7 @@ def test_real_sqlite_vector_top_k_closed_loop(tmp_path):
     )
 
     assert len(result.citations) == 2
-    assert all(c["source"] == "sqlite" for c in result.citations)
+    assert all(c["source"] == "vector" for c in result.citations)
 
     scores = [c["score"] for c in result.citations]
     assert scores == sorted(scores, reverse=True)
@@ -218,8 +218,8 @@ def test_real_sqlite_vector_min_score_closed_loop(tmp_path):
     assert len(loose_result.citations) > 0
     assert len(strict_result.citations) <= len(loose_result.citations)
 
-    assert all(c["source"] == "sqlite" for c in loose_result.citations)
-    assert all(c["source"] == "sqlite" for c in strict_result.citations)
+    assert all(c["source"] == "vector" for c in loose_result.citations)
+    assert all(c["source"] == "vector" for c in strict_result.citations)
 
     assert all(c["score"] >= 0.5 for c in strict_result.citations)
 

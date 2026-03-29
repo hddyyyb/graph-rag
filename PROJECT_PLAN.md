@@ -495,48 +495,116 @@ Deliverable:
 - Stronger system observability
 
 ---
-### Day28 — Graph Scoring Optimization (NEW)
+### Day28 — Hybrid Retrieval Fusion（COMPLETED ✅）
 
 Objective:
-Enhance graph retrieval quality by introducing edge-weight-aware scoring and improved expansion ranking.
+Unify vector retrieval and graph retrieval into a single fused candidate set with explainable scoring.
 
 Tasks:
 
-1. Introduce edge-weight-aware scoring:
-   - use CO_OCCURS_WITH.weight in Neo4j
-   - propagate edge weight into expanded term importance
+1. Fusion Layer (Application Layer)
+   - introduce `_fuse_chunks()` in QueryService
+   - merge by (doc_id, chunk_id)
+   - support:
+     - vector-only
+     - graph-only
+     - hybrid hits
+   - ensure cross-channel deduplication
 
-2. Improve expanded term ranking:
+2. Scoring Strategy
+   - introduce:
+     final_score = alpha * vector_score + beta * graph_score
+   - configurable parameters:
+     - fusion_alpha
+     - fusion_beta
+   - keep scoring explainable and extensible
+
+3. Retrieval Pipeline Upgrade
+   - replace:
+     vector + graph → extend
+   - with:
+     vector → graph → fusion → postprocess → generation
+
+4. Observability Enhancement
+   - add retrieval_debug["fusion"]:
+     - vector_score
+     - graph_score
+     - final_score
+     - vector_hit / graph_hit
+     - source (vector / graph / hybrid)
+
+5. Testing
+   - deduplication test
+   - vector-only / graph-only / hybrid test
+   - sorting correctness test
+   - debug correctness test
+
+Deliverable:
+
+- Hybrid Retrieval Fusion fully implemented
+- unified candidate set across retrieval channels
+- explainable fusion scoring
+- full observability for fusion stage
+
+
+### Day29 — Graph Scoring Optimization（UPDATED）
+
+Objective:
+Enhance graph retrieval quality by introducing edge-weight-aware scoring, improved expansion ranking, and fully explainable graph scoring signals.
+
+Tasks:
+
+1. Edge-weight-aware scoring
+   - leverage CO_OCCURS_WITH.weight in Neo4j
+   - propagate edge weight into expanded term contribution
+   - differentiate strong vs weak semantic relations
+
+2. Expanded term ranking
    - rank expanded terms by co-occurrence weight
-   - prioritize stronger semantic connections
+   - limit expansion based on top-weight candidates
+   - avoid noisy expansion terms
 
-3. Refine scoring function:
+3. Refine scoring function
    - current:
      - direct_hit_weight = 1.0
      - expanded_hit_weight = 0.5
-   - new:
-     - expanded score weighted by edge strength
-     - e.g.:
-       score = direct_count * w1 + Σ(expanded_weight * w2)
+   - upgraded:
+     score = direct_count * w1 + Σ(edge_weight * w2)
+   - keep parameters configurable:
+     - graph_direct_hit_weight
+     - graph_expanded_hit_weight
 
-4. Align behavior across backends:
-   - Neo4j uses real edge weights
-   - InMemoryGraphStore simulates weights (co-occurrence frequency)
+4. Backend alignment
+   - Neo4j:
+     - use actual edge weight from graph
+   - InMemoryGraphStore:
+     - simulate weight via co-occurrence frequency
+   - ensure consistent ranking behavior across backends
 
-5. Add tests:
-   - edge weight affects ranking
-   - stronger co-occurrence leads to higher rank
-   - regression test (old behavior still valid baseline)
+5. Observability enhancement（重点）
+   - extend graph debug output:
+     - expanded_terms:
+         - term
+         - weight
+         - contribution_to_score
+   - expose scoring breakdown for each chunk
+
+6. Testing
+   - verify edge weight impacts ranking
+   - stronger co-occurrence → higher score
+   - ensure backward compatibility
+   - memory vs neo4j consistency
 
 Deliverable:
 
 - Graph scoring upgraded from count-based → weight-aware
-- Better semantic ranking for graph retrieval
-- foundation for multi-hop reasoning
+- Improved semantic ranking quality
+- Fully explainable graph scoring pipeline
+- Foundation for multi-hop reasoning and advanced graph ranking
 
 
 
-### Day29 — Advanced Vector Store Backend
+### Day30 — Advanced Vector Store Backend
 
 Objective:
 Upgrade vector backend from SQLite to a production-grade vector database.
@@ -571,7 +639,7 @@ Deliverable:
 
 ---
 
-### Day30 — End-to-End System Hardening
+### Day31 — End-to-End System Hardening
 
 Objective:
 Stabilize the system for real usage and demos.
@@ -604,7 +672,7 @@ Deliverable:
 
 ---
 
-### Day31 — Final Integration & Production-Ready Packaging
+### Day32 — Final Integration & Production-Ready Packaging
 
 Objective:
 Prepare the project as a production-grade portfolio system.
