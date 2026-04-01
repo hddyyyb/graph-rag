@@ -42,3 +42,41 @@ def test_query_service_attaches_graph_debug():
     assert isinstance(graph_debug["direct_terms"], list)
     assert isinstance(graph_debug["expanded_terms"], list)
     assert isinstance(graph_debug["chunks"], list)
+
+
+
+
+def test_query_service_graph_debug_contains_weighted_fields():
+    query_service = build_test_service(
+        graph_store=InMemoryGraphStore(
+            expand_per_term_limit=2,
+            direct_hit_weight=1.0,
+            expanded_hit_weight=0.5,
+        )
+    )
+    result = query_service.query(
+        query ="rag",
+        enable_vector=False,
+        enable_graph=True,
+    )
+
+    graph_debug = result.retrieval_debug["graph"]
+
+    assert graph_debug is not None
+    assert "expanded_terms" in graph_debug
+    assert "chunks" in graph_debug
+    assert "weights" in graph_debug
+    assert "scoring_formula" in graph_debug
+
+    if graph_debug["expanded_terms"]:
+        item = graph_debug["expanded_terms"][0]
+        assert "query_term" in item
+        assert "expanded_term" in item
+        assert "weight" in item
+
+    if graph_debug["chunks"]:
+        item = graph_debug["chunks"][0]
+        assert "direct_score" in item
+        assert "expanded_score" in item
+        assert "score" in item
+        assert "expanded_hits" in item

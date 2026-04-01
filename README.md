@@ -1,54 +1,78 @@
-# 🚀 Production-Oriented GraphRAG System
+# 🚀 Enterprise GraphRAG System (Production-Oriented)
 
-> A clean-architecture GraphRAG system with hybrid retrieval (vector + graph), full ingest/query pipeline, and observability.
-
----
-
-## ✨ Overview
-
-This project implements a **production-oriented GraphRAG system** designed with **Clean Architecture** principles.
-
-It is not just a demo — but a **modular, extensible, and observable AI system** that simulates real-world backend engineering for LLM applications.
+> A production-oriented GraphRAG system with hybrid retrieval (vector + graph), explainable scoring, and clean architecture design.
 
 ---
 
-## 🧠 Key Features
+## 🧠 What This Project Solves
 
-- 🔹 **Hybrid Retrieval**
-  - Vector similarity search
-  - Graph-based retrieval (entity-level matching)
+Traditional RAG systems rely purely on vector similarity, which suffers from:
 
-- 🔹 **Full Pipeline**
-  - Ingest: document → chunk → embedding → storage
-  - Query: query → embedding → retrieval → post-process → LLM answer
+- lack of structural reasoning  
+- weak explainability  
+- unstable retrieval quality  
 
-- 🔹 **Clean Architecture**
-  - Domain / Application / Ports / Infra / API
-  - Fully decoupled components
-
-- 🔹 **Pluggable Components**
-  - Embedding models (SentenceTransformer / OpenAI / etc.)
-  - Vector stores (SQLite / Milvus-ready)
-  - Graph stores (InMemory → Neo4j-ready)
-  - LLM backends
-
-- 🔹 **Observability**
-  - Stage-level latency tracking:
-    - embedding_time
-    - retrieval_time
-    - postprocess_time
-    - generation_time
-  - Trace ID propagation
-
-- 🔹 **Engineering-Grade Design**
-  - Error boundaries
-  - Dependency injection
-  - Testable services
-  - Integration tests
+This project introduces a Graph-enhanced RAG system (GraphRAG) to address these issues.
 
 ---
 
-## 🏗️ Architecture
+## 🔥 Key Highlights
+
+### 1️⃣ Hybrid Retrieval (Core Innovation)
+
+- Vector retrieval → semantic similarity  
+- Graph retrieval → structural expansion  
+- Fusion → unified candidate ranking  
+
+```text
+final_score = α * vector_score + β * graph_score
+```
+---
+
+### 2️⃣ Graph Retrieval V3 (Edge-Aware)
+
+- 1-hop term expansion (CO_OCCURS_WITH)
+- Edge-weight-aware scoring
+- Structured expansion signals:
+
+```JSON
+{
+  "query_term": "llm",
+  "expanded_term": "rag",
+  "weight": 3.0
+}
+```
+---
+### 3️⃣ Explainable Retrieval (🔥 Key Feature)
+
+Each result is fully explainable:
+
+- direct_terms
+- expanded_terms
+- expanded_hits (with contribution)
+- direct_score / expanded_score / final_score
+
+👉 You can trace exactly why a chunk is retrieved
+
+---
+
+### 4️⃣ Clean Architecture (Engineering Focus)
+```API → Application → Ports → Infra```
+- QueryService / IngestService fully decoupled
+- Backend swap without changing business logic
+- Composition Root (container)
+
+---
+
+### 5️⃣ Dual Backend Support
+- Vector:
+  - SQLite (implemented)
+- Graph:
+  - InMemory / Neo4j (implemented)
+
+---
+
+## 🏗️ System Architecture
 
 ```
 Client
@@ -82,61 +106,25 @@ Document
 → Graph Store
 ```
 
-### Query Pipeline
-
-```markdown
+### 🔄 Retrieval Pipeline
+```
 Query
 → Embedding
-→ Hybrid Retrieval (Vector + Graph)
-→ Post-processing
-→ LLM Answer Generation
+→ Vector Retrieval
+→ Graph Retrieval (Expansion + Scoring)
+→ Fusion
+→ Postprocess
+→ Answer Generation
 ```
-
 ---
 
 ## ⚙️ Tech Stack
 
-- Python 3.10+
 - FastAPI
 - SentenceTransformers
-- SQLite (Vector Store)
-- (Planned) Neo4j (Graph Store)
+- SQLite
+- Neo4j
 - Pytest
-
----
-## 🚦 Current Status
-
-This project is a **partially real GraphRAG system**:
-
-| Component        | Status                  |
-|-----------------|-------------------------|
-| API             | ✅ Implemented           |
-| Ingest Pipeline | ✅ Implemented           |
-| Query Pipeline  | ✅ Implemented           |
-| Embedding       | ✅ Real (SentenceTransformer) |
-| Vector Store    | ✅ SQLite                |
-| Graph Store     | ⚠️ InMemory (Neo4j planned) |
-| Full Production | ❌ Not yet              |
-
-
-### Graph Retrieval (NEW)
-
-The system now supports a minimal GraphRAG capability:
-
-- Builds a lightweight graph during ingestion (term co-occurrence)
-- Enables graph-based retrieval via keyword matching
-- Can be toggled via `enable_graph=True`
-
-This is an initial step toward full GraphRAG support (Neo4j, multi-hop reasoning planned).
-
----
-
-## 🧩 Design Philosophy
-
-- Build **real systems**, not demos
-- Prioritize **modularity and replaceability**
-- Separate **business logic from infrastructure**
-- Design for **scalability from day one**
 
 ---
 
@@ -188,37 +176,18 @@ http://localhost:8000/docs
 ```bash
 pytest -q
 ```
----
-
-## 🧭 Roadmap
-
-- [ ] Replace InMemoryGraphStore with Neo4j
-- [ ] Introduce entity extraction for graph building
-- [ ] Integrate Milvus / FAISS for scalable vector search
-- [ ] Add streaming LLM responses
-- [ ] Production deployment (Docker + CI/CD)
 
 ---
 ## 💬 Interview Highlights
 
-- This project demonstrates:
-- System design for LLM applications
-- Clean Architecture in AI systems
-- Hybrid retrieval (vector + graph)
-- Observability in ML pipelines
-- Real-world backend engineering skills
+This project demonstrates:
+- how to design a production-grade RAG system
+- how to integrate graph-based retrieval
+- how to build explainable retrieval pipelines
+- how to apply Clean Architecture in AI systems
 
 ---
 
 ## 📌 One-Line Summary
 
-A **half-real, production-oriented GraphRAG system** designed for extensibility and real backend integration.
-
----
-
-
-## 👤 Author
-
-Zhang Yun
-PhD in AI | Focus on LLM Optimization & Graph Data Mining
-
+A production-oriented GraphRAG system with hybrid retrieval and explainable scoring.

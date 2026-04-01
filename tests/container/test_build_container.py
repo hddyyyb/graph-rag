@@ -80,3 +80,23 @@ def test_build_container_passes_graph_retrieval_v2_settings_to_memory_store():
     assert graph_store.direct_hit_weight == 1.0
     assert graph_store.expanded_hit_weight == 0.25
     assert graph_store.max_expanded_terms == 7
+
+
+
+
+def test_build_container_passes_graph_weighted_config_to_memory_store():
+    settings = Settings(
+        graph_store_backend="memory",
+        graph_expand_per_term_limit=3,
+        graph_max_expanded_terms=7,
+        graph_direct_hit_weight=1.2,
+        graph_expanded_hit_weight=0.4,
+    )
+
+    container = build_container(settings)
+    graph_store = container["graph_store"]
+
+    assert graph_store.expand_per_term_limit == 3
+    assert graph_store.max_expanded_terms == 7
+    assert graph_store.direct_hit_weight == 1.2
+    assert graph_store.expanded_hit_weight == 0.4

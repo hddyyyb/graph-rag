@@ -387,3 +387,32 @@ def test_mentions_edges_are_created(neo4j_driver, neo4j_database, clean_graph):
 
     assert row is not None
     assert row["cnt"] == 1
+
+
+
+@pytest.mark.integration
+def test_neo4j_graph_store_expanded_terms_sorted_by_weight(neo4j_driver, neo4j_config):
+    store = Neo4jGraphStore(
+        driver=neo4j_driver,
+        database=neo4j_config["neo4j_database"],
+        expand_per_term_limit=5,
+        direct_hit_weight=1.0,
+        expanded_hit_weight=0.5,
+        max_expanded_terms=10,
+    )
+
+    store.upsert_chunk_graphs(
+        [
+            ChunkGraphRecord(doc_id="d1", chunk_id="c1", text="rag graph", terms=["rag", "graph"]),
+            ChunkGraphRecord(doc_id="d2", chunk_id="c2", text="rag graph", terms=["rag", "graph"]),
+            ChunkGraphRecord(doc_id="d3", chunk_id="c3", text="rag graph", terms=["rag", "graph"]),
+            ChunkGraphRecord(doc_id="d4", chunk_id="c4", text="rag ranking", terms=["rag", "ranking"]),
+        ]
+    )
+
+    store.search("rag", top_k=10)
+    debug = store.get_last_debug()
+
+    assert debug is not None
+    assert debug["expanded_terms"][0]["expanded_term"] == "graph"
+    assert debug["expanded_terms"][0]["weight"] > debug["expanded_terms"][1]["weight"]

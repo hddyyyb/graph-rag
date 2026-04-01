@@ -80,3 +80,71 @@ def test_inmemory_graph_debug_score_matches_chunk_score():
         )
         assert dbg["score"] == expected_score
         assert hit.score == dbg["score"]
+
+
+def test_inmemory_graph_store_debug_contains_weight_and_contribution():
+    store = InMemoryGraphStore(
+        expand_per_term_limit=5,
+        direct_hit_weight=1.0,
+        expanded_hit_weight=0.5,
+        max_expanded_terms=10,
+    )
+
+    store.upsert_chunk_graphs(
+        [
+            ChunkGraphRecord(
+                doc_id="d1",
+                chunk_id="c1",
+                text="rag graph",
+                terms=["rag", "graph"],
+            ),
+            ChunkGraphRecord(
+                doc_id="d2",
+                chunk_id="c2",
+                text="graph systems",
+                terms=["graph", "systems"],
+            ),
+        ]
+    )
+
+    store.search("rag", top_k=10)
+    debug = store.get_last_debug()
+
+    assert debug is not None
+    assert "expanded_terms" in debug
+    assert "chunks" in debug
+    assert "weights" in debug
+
+    if debug["expanded_terms"]:
+        first = debug["expanded_terms"][0]
+        assert "weight" in first
+
+    if debug["chunks"]:
+        first_chunk = debug["chunks"][0]
+        assert "expanded_hits" in first_chunk
+        assert "direct_score" in first_chunk
+        assert "expanded_score" in first_chunk
+        assert "score" in first_chunk
+
+        if first_chunk["expanded_hits"]:
+            first_hit = first_chunk["expanded_hits"][0]
+            assert "weight" in first_hit
+            assert "contribution" in first_hit
+
+    # debug["chunks"] 是 被召回的 chunk 列表
+    # chunk["expanded_hits"] 是 这个 chunk 被命中的“原因”
+    '''
+    {
+        "chunk_id": "c2",
+        "expanded_hits": [
+            {
+            "query_term": "rag",
+            "expanded_term": "graph",
+            "weight": 3.0,
+            "contribution": 1.5
+            },
+            {
+            ...
+            }
+        ]
+        }'''

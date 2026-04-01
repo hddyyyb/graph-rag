@@ -18,6 +18,51 @@ from .query_option import QueryOptions, normalize_query_options
 import time
 
 
+'''
+retrieval_debug["graph"] 最终结构
+{
+    "query_terms": [...],
+    "direct_terms": [...],
+    "expanded_terms": [
+        {
+            "query_term": "rag",
+            "expanded_term": "graph",
+            "weight": 4.0,
+        }
+    ],
+    "chunks": [
+        {
+            "chunk_id": "c1",
+            "doc_id": "d1",
+            "direct_terms": ["rag"],
+            "expanded_hits": [
+                {
+                    "query_term": "rag",
+                    "expanded_term": "graph",
+                    "weight": 4.0,
+                    "contribution": 2.0,
+                }
+            ],
+            "direct_hit_count": 1,
+            "expanded_hit_count": 1,
+            "direct_score": 1.0,
+            "expanded_score": 2.0,
+            "score": 3.0,
+        }
+    ],
+    "weights": {
+        "direct_hit_weight": 1.0,
+        "expanded_hit_weight": 0.5,
+    },
+    "scoring_formula": "score = direct_hit_count * direct_hit_weight + sum(expanded_edge_weight * expanded_hit_weight)",
+    "meta": {
+        "expansion_depth": 1,
+        "expand_per_term_limit": 2,
+        "max_expanded_terms": 10,
+    },
+}
+'''
+
 
 class QueryService:
     def __init__(
@@ -254,7 +299,11 @@ class QueryService:
                     query = q, 
                     top_k = graph_k
                     )
-                graph_debug = self.graph_store.get_last_debug()
+                
+                if hasattr(self.graph_store, "get_last_debug"): # 确定有注入
+                    graph_debug = self.graph_store.get_last_debug()
+                else:
+                    graph_debug = None
             except Exception as e:
                 self._handle_query_failure(
                     stage="retrieval",

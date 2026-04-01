@@ -13,6 +13,52 @@ It includes:
 This is no longer just an architecture skeleton.
 It is now a partially functional GraphRAG system with real ingest/query pipelines and partially real infra.
 
+### 0.1 System Overview
+
+This system is a production-oriented GraphRAG architecture designed to:
+
+- combine vector retrieval and graph retrieval
+- improve recall via structural expansion
+- provide full explainability for retrieval results
+
+Core design:
+
+1. Hybrid retrieval (vector + graph)
+2. Edge-weight-aware graph scoring
+3. Explainable retrieval pipeline
+4. Clean architecture with pluggable backends
+
+### 0.2 Retrieval Pipeline (Core Design)
+
+The retrieval pipeline consists of three stages:
+
+1. Vector Retrieval
+   - semantic similarity via embedding
+
+2. Graph Retrieval
+   - term extraction
+   - 1-hop expansion (CO_OCCURS_WITH)
+   - edge-weight scoring
+
+3. Fusion
+   - merge vector + graph results
+   - deduplicate by (doc_id, chunk_id)
+   - compute final score:
+     final_score = α * vector_score + β * graph_score
+
+
+### 0.3 Explainability Design
+
+Each retrieval result includes:
+
+- direct_terms
+- expanded_terms
+- expanded_hits (with contribution)
+- direct_score
+- expanded_score
+- final_score
+
+This enables full traceability of retrieval decisions.
 ---
 
 ## 1. Current System Snapshot
@@ -602,6 +648,91 @@ Deliverable:
 - Fully explainable graph scoring pipeline
 - Foundation for multi-hop reasoning and advanced graph ranking
 
+
+---
+
+## 🚀 Day29 Update — Graph Retrieval V3 (Edge-aware Scoring)
+
+### 🔥 Overview
+
+We upgraded Graph Retrieval from simple term matching to **edge-weight-aware scoring**, leveraging graph structure (co-occurrence weights) for more accurate and explainable ranking.
+
+---
+
+### ⚙️ Key Enhancements
+
+#### 1. Edge-weight-aware scoring
+
+Before:
+
+
+score = direct_count * w1 + expanded_count * w2
+
+
+After:
+
+
+score = direct_count * direct_hit_weight
++ Σ(edge_weight × expanded_hit_weight)
+
+
+---
+
+#### 2. Structured expanded terms
+
+```json
+{
+  "query_term": "llm",
+  "expanded_term": "rag",
+  "weight": 3.0
+}
+
+Sources:
+
+InMemoryGraphStore → term_graph
+Neo4jGraphStore → CO_OCCURS_WITH.weight
+3. Explainable retrieval scoring
+
+Each chunk now includes:
+
+{
+  "direct_score": 1.0,
+  "expanded_score": 1.5,
+  "score": 2.5,
+  "expanded_hits": [...]
+}
+4. Backend consistency (Memory vs Neo4j)
+identical expansion
+identical scoring
+identical debug output
+
+Verified via integration tests.
+
+5. Config-driven graph scoring
+
+All parameters are configurable:
+
+graph_direct_hit_weight
+graph_expanded_hit_weight
+graph_expand_per_term_limit
+graph_max_expanded_terms
+🧠 Impact
+
+This upgrade transforms GraphRAG from:
+
+keyword-based expansion
+
+into:
+
+structure-aware semantic reasoning system
+
+📈 Result
+Capability	Status
+Graph expansion	✅
+Edge-weight scoring	✅
+Explainability	✅
+Backend consistency	✅
+Production readiness	High
 
 
 ### Day30 — Advanced Vector Store Backend

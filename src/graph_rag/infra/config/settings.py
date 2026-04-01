@@ -36,9 +36,14 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
     # 把Graph Retrieval V2也纳入统一配置系统
     graph_expand_hops: int = 1
     graph_expand_per_term_limit: int = Field(default=2, ge=1)  # ≥ 1, 每个 query term 最多扩展多少个“相关 term”
+    graph_max_expanded_terms: int = Field(default=10, ge=1)     # ≥ 1, 最多扩展多少个 term
+    
     graph_direct_hit_weight: float = Field(default=1.0, gt=0)  # > 0, 原始 query term 命中的权重
     graph_expanded_hit_weight: float = Field(default=0.5, ge=0)  # 可以为0, 图扩展 term 命中的权重
-    graph_max_expanded_terms: int = Field(default=10, ge=1)     # ≥ 1, 最多扩展多少个 term
+
+    # fusion
+    fusion_alpha: float = Field(default=0.5, ge=0, le=1)  # [0,1], 向量相似度的权重
+    fusion_beta: float = Field(default=0.5, ge=0, le=1)   # [0,1], 图相似度的权重
 
     # neo4j
     neo4j_uri: str = "bolt://localhost:7687"

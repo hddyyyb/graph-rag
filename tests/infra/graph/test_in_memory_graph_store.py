@@ -109,3 +109,59 @@ def test_search_uses_stable_order_when_scores_tie():
     results = store.search("alpha", top_k=10)
 
     assert [x.chunk_id for x in results] == ["c1", "c2"]
+
+
+def test_inmemory_graph_store_edge_weight_affects_ranking():
+    store = InMemoryGraphStore(
+        expand_per_term_limit=5,
+        direct_hit_weight=1.0,
+        expanded_hit_weight=0.5,
+        max_expanded_terms=10,
+    )
+
+    store.upsert_chunk_graphs(
+        [
+            ChunkGraphRecord(
+                doc_id="d1",
+                chunk_id="c1",
+                text="contains graph only",
+                terms=["graph"],
+            ),
+            ChunkGraphRecord(
+                doc_id="d2",
+                chunk_id="c2",
+                text="contains ranking only",
+                terms=["ranking"],
+            ),
+        ]
+    )
+
+    # 强化 rag-graph
+    for i in range(4):
+        store.upsert_chunk_graphs(
+            [
+                ChunkGraphRecord(
+                    doc_id=f"extra_g_{i}",
+                    chunk_id=f"extra_g_{i}",
+                    text="rag graph",
+                    terms=["rag", "graph"],
+                )
+            ]
+        )
+
+    # 弱化 rag-ranking
+    store.upsert_chunk_graphs(
+        [
+            ChunkGraphRecord(
+                doc_id="extra_r",
+                chunk_id="extra_r",
+                text="rag ranking",
+                terms=["rag", "ranking"],
+            )
+        ]
+    )
+
+    chunks = store.search("rag", top_k=10)
+    by_chunk = {c.chunk_id: c for c in chunks}
+
+    assert by_chunk["c1"].score > by_chunk["c2"].score
