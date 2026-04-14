@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass  # A lightweight way to define classes in Python
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Mapping
 
 # These objects are used for internal communication within the application layer.
 # api/schemas: HTTP request/response models (external)
@@ -37,7 +37,12 @@ class Answer:    # Returned by QueryService
     citations: Optional[List[Dict[str, Any]]] = None
 
 
-
+@dataclass(frozen=True)
+class Chunk:
+    chunk_id: str
+    text: str
+    position: int
+    parent_id: str
 
 
 

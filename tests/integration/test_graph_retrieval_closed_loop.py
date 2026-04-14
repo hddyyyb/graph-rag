@@ -9,6 +9,7 @@ from graph_rag.infra.adapters import (
     InMemoryVectorStore,
     SentenceTransformerEmbeddingProvider,
     FakeKernel,
+    FixedLengthChunker,
 )
 from graph_rag.infra.observability.fake_trace import FakeTrace
 
@@ -23,12 +24,14 @@ def test_graph_retrieval_closed_loop_with_graph_only():
     kernel = FakeKernel()
     trace = FakeTrace()
     post_processor = DefaultRetrievalPostProcessor()
+    chunker = FixedLengthChunker()
 
     ingest_service = IngestService(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,
         trace=trace,
+        chunker=chunker,
     )
 
     query_service = QueryService(

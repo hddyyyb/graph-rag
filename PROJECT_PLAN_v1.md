@@ -295,14 +295,20 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
 
 ### Tasks
 
+#### Day30 — Strategy Implementation (Completed)
+
 - implement multiple chunking strategies:
 
 ```text
 - fixed-length chunking
 - recursive chunking (recommended)
-- semantic chunking (optional)
+- semantic chunking (optional, not implemented)
 ```
+- introduce Chunker abstraction (ChunkerPort)
+- integrate chunker into container
+- enable runtime strategy switching via Settings
 
+#### Day31 — Metadata & Quality Optimization
 - add chunk metadata:
 
 ```json
@@ -310,13 +316,23 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
   "chunk_id": "...",
   "parent_id": "...",
   "position": 0,
+  "length": 123,
   "section": "..."
 }
 ```
+- basic chunk quality validation:
+  - chunk size distribution
+  - chunk count
 
 ### 🎯 Goal
 
-Improve retrieval recall at the data level. Better chunking directly impacts retrieval granularity and recall quality.
+Improve retrieval recall at the data level.
+
+Better chunking:
+
+- improves semantic granularity
+- increases recall
+- provides cleaner input for vector and graph retrieval
 
 ---
 

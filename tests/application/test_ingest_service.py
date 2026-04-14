@@ -7,6 +7,7 @@ from graph_rag.domain.models import RetrievedChunk
 from graph_rag.domain.graph_models import ChunkGraphRecord
 from graph_rag.infra.adapters import InMemoryVectorStore
 from graph_rag.infra.observability.fake_trace import FakeTrace
+from graph_rag.infra.adapters.fixed_length_chunker import FixedLengthChunker
 
 
 class FakeEmbedder:
@@ -35,14 +36,14 @@ def test_ingest_service_writes_chunk_graph_records():
     graph_store = SpyGraphStore()
     embedder = FakeEmbedder()
     trace = FakeTrace()
+    chunker = FixedLengthChunker(chunk_size=10, chunk_overlap=0)
 
     service = IngestService(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,
         trace=trace,
-        chunk_size=10,
-        chunk_overlap=0,
+        chunker=chunker,
     )
 
     service.ingest(

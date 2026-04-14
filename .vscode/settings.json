@@ -1,3 +1,5 @@
 {
-    "github.copilot.nextEditSuggestions.enabled": true
+  "python.defaultInterpreterPath": "E:\\conda\\envs\\Production-GraphRAG\\python.exe",
+    "python.terminal.activateEnvironment": true
+
 }

@@ -317,8 +317,7 @@ ingest_service = IngestService(
     graph_store=graph_store,
     embedder=embedder,
     trace=trace,
-    chunk_size=settings.chunk_size,
-    chunk_overlap=settings.chunk_overlap,
+    chunker=chunker,
 )
 ```
 

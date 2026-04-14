@@ -20,6 +20,8 @@ from .openai_llm import OpenAILLM
 
 from .retrieval_post_processor import DefaultRetrievalPostProcessor
 
+from .fixed_length_chunker import FixedLengthChunker
+from .recursive_chunker import RecursiveChunker
 
 
 __all__ = [
@@ -39,6 +41,8 @@ __all__ = [
     "OpenAILLM",
     "DefaultRetrievalPostProcessor",
     "FakeKernel",
+    "FixedLengthChunker",
+    "RecursiveChunker",
 ]
 
 

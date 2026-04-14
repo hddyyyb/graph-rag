@@ -31,6 +31,8 @@ from graph_rag.infra.adapters import (
     FakeLLM,
     LocalLLM,
     DefaultRetrievalPostProcessor,
+    FixedLengthChunker,
+    RecursiveChunker,
 )
 from graph_rag.application import IngestService, QueryService
 
@@ -74,14 +76,30 @@ def build_graph_store(settings: Settings):
 def build_settings(settings_override: dict | None = None) -> Settings:
     return Settings(**(settings_override or {}))
 
-
+def build_chunker(settings: Settings):
+    chunking_strategy = settings.chunking_strategy
+    if chunking_strategy == "fixed":
+        return FixedLengthChunker(
+            chunk_size=settings.chunk_size, 
+            chunk_overlap=settings.chunk_overlap,
+            )
+    elif chunking_strategy == "recursive":
+        return RecursiveChunker(
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap,
+        )
+    else:
+        raise ValueError(f"unknown chunking strategy: {chunking_strategy}")
+    
+    
+    
 def build_container(settings: Settings) -> Dict[str, Any]: 
     # 创建DI容器（settings、trace、stores、services等实例）
     setup_logging(settings.log_level)     # 把日志系统按配置初始化, 日志初始化要尽早做, 因为后面构造组件/处理请求都要记录日志。
 
     clock = SystemClock()
-    
-    
+    chunker = build_chunker(settings)
+
     # 第一步：先实例化底层基础组件（Clock、Trace、PostProcessor、LLM、Stores、Embedder等），这些组件没有业务逻辑，主要负责和外部系统交互（数据库、embedding API、LLM API等）。
     trace = SimpleTrace(clock = clock)                 # 2.2 Trace对象：请求链路的“上下文”
 
@@ -130,6 +148,8 @@ def build_container(settings: Settings) -> Dict[str, Any]:
         embedder = HashEmbeddingProvider(dim=32)
     elif embedding_backend == 'fake':
         embedder = FakeEmbeddingV2()
+    else:
+        raise ValueError(f"unknown embedding_backend: {embedding_backend}")
 
 
     #kernel = SimpleKernel()
@@ -144,8 +164,7 @@ def build_container(settings: Settings) -> Dict[str, Any]:
         graph_store=graph_store,
         embedder=embedder,
         trace=trace,
-        chunk_size=settings.chunk_size,
-        chunk_overlap=settings.chunk_overlap,
+        chunker=chunker,
     )
     # 查询→向量召回+图召回→融合→交给kernel生成回答
     query_service = QueryService(

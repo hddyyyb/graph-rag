@@ -15,6 +15,7 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
     graph_top_k: int = Field(default=5, ge=1)
 
     # chunking
+    chunking_strategy: Literal["fixed", "recursive"] = "recursive"
     chunk_size: int = Field(default=400, ge=1)
     chunk_overlap: int = Field(default=50, ge=0)
 
@@ -71,6 +72,7 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
         "graph_store_backend",
         "vector_store_backend",
         "llm_backend",
+        "chunking_strategy",
         mode="before",
     )  # 对这4个字段，在“赋值之前”统一做处理，mode="before"-在 Pydantic 做类型检查之前执行
     @classmethod  # 这个函数属于类，而不是某个实例

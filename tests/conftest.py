@@ -52,22 +52,6 @@ def neo4j_store(neo4j_driver, neo4j_config, clean_graph):
     )
 
 
-
-@pytest.fixture
-def neo4j_driver():
-    """
-    Provide a real Neo4j driver for integration tests.
-
-    The driver is created before the test and automatically closed after it.
-    """
-    uri, username, password, _ = _require_neo4j_env()
-    driver = GraphDatabase.driver(uri, auth=(username, password))
-    try:
-        yield driver
-    finally:
-        driver.close()
-
-
 @pytest.fixture
 def neo4j_database() -> str | None:
     """Return the configured Neo4j database name, if provided."""
@@ -76,19 +60,12 @@ def neo4j_database() -> str | None:
 
 
 @pytest.fixture
-def clean_graph(neo4j_driver, neo4j_database):
-    """
-    Best-effort cleanup before and after each test.
-
-    For local isolated testing, clearing the whole graph is acceptable.
-    If safer multi-tenant testing is needed later, this can be replaced
-    with prefix-based cleanup.
-    """
-    _wipe_all_nodes(neo4j_driver, neo4j_database)
+def clean_graph(neo4j_driver, neo4j_config):  # 得到yield driver, 和neo4j_config返回值
+    _wipe_all_nodes(neo4j_driver, neo4j_config["neo4j_database"])  # Step 1：测试开始前
     try:
-        yield
-    finally:
-        _wipe_all_nodes(neo4j_driver, neo4j_database)
+        yield    # Step 2：进入测试
+    finally:    # Step 4：测试结束后
+        _wipe_all_nodes(neo4j_driver, neo4j_config["neo4j_database"])
 
 
 # -----------------------------------------------------------------------------
@@ -99,8 +76,7 @@ def _wipe_all_nodes(driver, database: str | None) -> None:
     """Remove all nodes and relationships from the test database."""
     with driver.session(database=database) as session:
         session.run("MATCH (n) DETACH DELETE n")
-
-        
+ 
 
 def _require_neo4j_env() -> tuple[str, str, str, str | None]:
     """
@@ -164,30 +140,3 @@ def neo4j_driver(neo4j_config):
     finally:
         driver.close()
     # yield = “返回一个值，但函数不会结束，下次还能从这里继续执行”
-
-#  pytest 在同一个 scope 生命周期内会缓存 fixture 的结果
-
-# -----------------------------------------------------------------------------
-# graph cleanup
-# -----------------------------------------------------------------------------
-
-def _wipe_all_nodes(driver, database: str | None) -> None:
-    """
-    Remove all nodes and relationships from the test database.
-
-    This ensures test isolation across runs.
-    """
-    with driver.session(database=database) as session:  # ① 打开一个 session:“我现在要操作 Neo4j 这个数据库了”
-        session.run("MATCH (n) DETACH DELETE n")  # ② 执行 Cypher
-        # MATCH (n) 找到所有节点
-        # DETACH DELETE n 删除这些节点和它们的关系
-
-
-@pytest.fixture
-def clean_graph(neo4j_driver, neo4j_config):  # 得到yield driver, 和neo4j_config返回值
-    _wipe_all_nodes(neo4j_driver, neo4j_config["neo4j_database"])  # Step 1：测试开始前
-    try:
-        yield    # Step 2：进入测试
-    finally:    # Step 4：测试结束后
-        _wipe_all_nodes(neo4j_driver, neo4j_config["neo4j_database"])
-

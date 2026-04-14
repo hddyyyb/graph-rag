@@ -8,6 +8,7 @@ from graph_rag.infra.adapters import (
     SQLiteVectorStore,
     SentenceTransformerEmbeddingProvider,
     FakeKernel,
+    FixedLengthChunker,
 )
 from graph_rag.infra.observability.fake_trace import FakeTrace
 
@@ -30,12 +31,13 @@ def test_real_sqlite_vector_only_closed_loop(tmp_path):
     kernel = FakeKernel()
     trace = FakeTrace()
     post_processor = DefaultRetrievalPostProcessor()
-
+    chunker = FixedLengthChunker()
     ingest_service = IngestService(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,
         trace=trace,
+        chunker=chunker,
     )
 
 
@@ -106,6 +108,7 @@ def test_real_sqlite_vector_top_k_closed_loop(tmp_path):
         graph_store=graph_store,
         embedder=embedder,
         trace=trace,
+        chunker=FixedLengthChunker(),
     )
 
     query_service = QueryService(
@@ -174,6 +177,7 @@ def test_real_sqlite_vector_min_score_closed_loop(tmp_path):
         graph_store=graph_store,
         embedder=embedder,
         trace=trace,
+        chunker=FixedLengthChunker(),
     )
 
     query_service = QueryService(
