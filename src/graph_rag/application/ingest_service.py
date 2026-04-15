@@ -14,10 +14,6 @@ from graph_rag.ports.chunker import ChunkerPort
 
 from graph_rag.common.text_utils import extract_terms
 
-# 负责“文档写入流程”的业务编排。
-
-
-
 
 class IngestService:    # 文档入库的业务流程控制器
     def __init__(
@@ -51,9 +47,30 @@ class IngestService:    # 文档入库的业务流程控制器
         chunks = self.chunker.chunk(text = text, parent_id = doc_id)
         if not chunks:
             raise ValidationError("切分后chunks为空")
-
+        
         self.trace.bind(doc_id=doc_id)
+        
+        
+        chunk_lengths = [chunk.length for chunk in chunks]
+        chunk_count = len(chunks)
+        min_length = min(chunk_lengths)
+        max_length = max(chunk_lengths)
+        avg_length = sum(chunk_lengths) / chunk_count
+        
+        self.trace.event(
+            "chunk_quality",
+            chunk_count=chunk_count,
+            min_length=min_length,
+            max_length=max_length,
+            avg_length=avg_length,
+        )
+        self.trace.event(
+            "chunk_lengths_preview",
+            count=chunk_count,
+            lengths=chunk_lengths[:10],
+        )
         self.trace.event("ingest_start", chunks=len(chunks))
+
 
         chunk_texts = [chunk.text for chunk in chunks]
         embeddings = self.embedder.embed_texts(chunk_texts)    # IngestServices初始化时候传入embedder，代码中写的是接口/父类

@@ -7,7 +7,14 @@ from graph_rag.infra.adapters import (
     DefaultRetrievalPostProcessor,
     FakeEmbeddingV2,
     FakeKernel,
+    InMemoryGraphStore,
+    InMemoryVectorStore,
+    FixedLengthChunker,
+    RecursiveChunker,
+    FixedClock,
 )
+
+
 from graph_rag.infra.observability.fake_trace import FakeTrace
 
 from graph_rag.ports.vector_store import VectorStorePort
@@ -16,9 +23,12 @@ from graph_rag.ports.embedding import EmbeddingProviderPort
 from graph_rag.ports.kernel import RAGKernelPort
 from graph_rag.ports.retrieval_post_processor import RetrievalPostProcessorPort
 from graph_rag.ports.observability import TracePort
+from graph_rag.ports.chunker import ChunkerPort
 
 from tests.fakes.fake_vector_store import FakeVectorStore
 from tests.fakes.fake_graph_store import FakeGraphStore
+
+from graph_rag.application.ingest_service import IngestService
 
 
 def build_test_service(
@@ -42,3 +52,21 @@ def build_test_service(
         vector_top_k=vector_top_k,
         graph_top_k=graph_top_k,
     )
+
+
+def build_test_ingest_service(
+    *,
+    vector_store: Optional[VectorStorePort] = None,
+    graph_store: Optional[GraphStorePort] = None,
+    embedder: Optional[EmbeddingProviderPort] = None,
+    trace: Optional[TracePort] = None,
+    chunker: Optional[ChunkerPort] = None,
+) -> IngestService:
+    service = IngestService(
+        vector_store= vector_store or InMemoryVectorStore(),
+        graph_store= graph_store or InMemoryGraphStore(),
+        embedder=embedder or FakeEmbeddingV2(),
+        trace=trace or FakeTrace(),
+        chunker=chunker or FixedLengthChunker(chunk_size=50, chunk_overlap=0),
+    )
+    return service

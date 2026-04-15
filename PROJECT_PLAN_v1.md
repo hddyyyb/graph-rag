@@ -293,9 +293,7 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
 
 ## Day30–Day31 — Chunking Optimization (🔥 Highest Priority)
 
-### Tasks
-
-#### Day30 — Strategy Implementation (Completed)
+### Day30 — Strategy Implementation (Completed)
 
 - implement multiple chunking strategies:
 
@@ -308,8 +306,8 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
 - integrate chunker into container
 - enable runtime strategy switching via Settings
 
-#### Day31 — Metadata & Quality Optimization
-- add chunk metadata:
+#### Day31 — Metadata & Quality Optimization (Completed)
+- extend Chunk metadata (minimal scope only):
 
 ```json
 {
@@ -317,22 +315,31 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
   "parent_id": "...",
   "position": 0,
   "length": 123,
-  "section": "..."
+  "section": null
 }
 ```
-- basic chunk quality validation:
-  - chunk size distribution
-  - chunk count
+- principles:
+  - minimal fields only
+  - no impact on core schema or downstream logic
+
+- metadata population:
+  - length: auto-computed
+  - section: reserved
+
+- added chunk quality observability:
+  - chunk_count
+  - min / max / avg length
+  - length distribution preview
+
+- added ingest-level tests for chunk quality
 
 ### 🎯 Goal
 
-Improve retrieval recall at the data level.
+- improve retrieval quality via better chunking
+- enable chunk-level observability
 
-Better chunking:
-
-- improves semantic granularity
-- increases recall
-- provides cleaner input for vector and graph retrieval
+Key shift:
+chunking → from preprocessing → to optimizable component
 
 ---
 

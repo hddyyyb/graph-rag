@@ -43,6 +43,8 @@ class Chunk:
     text: str
     position: int
     parent_id: str
+    length: int
+    section: str | None = None
 
 
 

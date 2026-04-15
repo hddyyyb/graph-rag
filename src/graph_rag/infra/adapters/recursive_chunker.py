@@ -48,6 +48,7 @@ class RecursiveChunker(ChunkerPort):
                 text=c,
                 position=i,
                 parent_id=parent_id,
+                length=len(c),
             )
             for i, c in enumerate(chunks)
         ]

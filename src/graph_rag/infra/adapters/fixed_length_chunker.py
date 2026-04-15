@@ -34,6 +34,7 @@ class FixedLengthChunker(ChunkerPort):
                     text=chunk_text,
                     position=position,
                     parent_id=parent_id,
+                    length=len(chunk_text),
                 )
             )
             start += step
