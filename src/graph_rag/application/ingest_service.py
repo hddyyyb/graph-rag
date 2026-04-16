@@ -11,6 +11,7 @@ from graph_rag.ports.observability import TracePort
 from graph_rag.ports.vector_store import VectorStorePort
 from graph_rag.ports.graph_store import GraphStorePort
 from graph_rag.ports.chunker import ChunkerPort
+from graph_rag.ports.document_loader import DocumentLoaderPort
 
 from graph_rag.common.text_utils import extract_terms
 
@@ -23,13 +24,44 @@ class IngestService:    # 文档入库的业务流程控制器
         embedder: EmbeddingProviderPort,
         trace: TracePort,
         chunker: ChunkerPort,
+        document_loader: DocumentLoaderPort,
     ) -> None:
         self.vector_store = vector_store
         self.graph_store = graph_store
         self.embedder = embedder
         self.trace = trace
         self.chunker = chunker
+        self.document_loader = document_loader
+    
+    def ingest_file(
+        self,
+        *,
+        doc_id: str,
+        file_path: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> IngestResult:
+        doc_id = (doc_id or "").strip()
+        if not doc_id:
+            raise ValidationError("doc_id不能为空")
 
+        file_path = (file_path or "").strip()
+        if not file_path:
+            raise ValidationError("file_path不能为空")
+
+        text = self.document_loader.load_from_path(file_path)
+        text = (text or "").strip()
+        if not text:
+            raise ValidationError("文档解析后text为空")
+
+        self.trace.bind(doc_id=doc_id, file_path=file_path)
+        self.trace.event("document_loaded", file_path=file_path, text_length=len(text))
+
+        return self.ingest(
+            doc_id=doc_id,
+            text=text,
+            metadata=metadata,
+        )
+        
     def ingest(
         self,
         *,

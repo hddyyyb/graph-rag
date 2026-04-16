@@ -8,7 +8,8 @@ from graph_rag.domain.graph_models import ChunkGraphRecord
 from graph_rag.infra.adapters import InMemoryVectorStore
 from graph_rag.infra.observability.fake_trace import FakeTrace
 from graph_rag.infra.adapters.fixed_length_chunker import FixedLengthChunker
-
+from tests.helpers import build_test_ingest_service, build_test_service
+from graph_rag.ports.graph_store import GraphStorePort
 
 class FakeEmbedder:
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
@@ -18,7 +19,7 @@ class FakeEmbedder:
         return [1.0, 0.0, 0.0]
 
 
-class SpyGraphStore:
+class SpyGraphStore(GraphStorePort):
     def __init__(self) -> None:
         self.called = False
         self.records: List[ChunkGraphRecord] = []
@@ -29,6 +30,9 @@ class SpyGraphStore:
 
     def search(self, query: str, top_k: int) -> List[RetrievedChunk]:
         return []
+    
+    def get_last_debug(self) -> dict:
+        return {}
 
 
 def test_ingest_service_writes_chunk_graph_records():
@@ -38,7 +42,7 @@ def test_ingest_service_writes_chunk_graph_records():
     trace = FakeTrace()
     chunker = FixedLengthChunker(chunk_size=10, chunk_overlap=0)
 
-    service = IngestService(
+    service = build_test_ingest_service(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,

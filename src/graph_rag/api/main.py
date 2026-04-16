@@ -34,6 +34,8 @@ from graph_rag.infra.adapters import (
     FixedLengthChunker,
     RecursiveChunker,
 )
+from graph_rag.infra.document_loaders import SimpleDocumentLoader
+
 from graph_rag.application import IngestService, QueryService
 
 from graph_rag.infra.config import Settings
@@ -156,6 +158,8 @@ def build_container(settings: Settings) -> Dict[str, Any]:
     kernel = SimpleRAGKernel(llm=llm)
     # Application services  2.4 Application services：业务用例层（Ingest/Query）
 
+    document_loader = SimpleDocumentLoader()
+    
     '''Service-- 对应 业务流程, 代码是port(父类的东西), 它的参数是实例化的从西, infra实现的'''
     # 第二步：再实例化 service（IngestService、QueryService），这些service负责实现核心业务逻辑（摄入流程、查询流程），它们依赖第一步实例化的基础组件/适配器来完成工作。
     # 把文档/文本摄入→切块→embedding→写入vector store→抽取图→写入graph store
@@ -165,6 +169,7 @@ def build_container(settings: Settings) -> Dict[str, Any]:
         embedder=embedder,
         trace=trace,
         chunker=chunker,
+        document_loader=document_loader,
     )
     # 查询→向量召回+图召回→融合→交给kernel生成回答
     query_service = QueryService(

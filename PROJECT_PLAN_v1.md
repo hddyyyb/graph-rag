@@ -343,28 +343,37 @@ chunking → from preprocessing → to optimizable component
 
 ---
 
-## Day32 — Multi-format Document Support
+## Day32 — Multi-format Document Support(Completed)
 
-### Tasks
+### ✅ Completed
 
-Support:
+- introduced DocumentLoader abstraction(`DocumentLoaderPort`, `SimpleDocumentLoader`)
+- supported input formats: TXT / PDF / DOCX
+- introduced unified ingestion flow:
 
-- PDF
-- TXT
-- DOCX
-
-### Example
-
-```python
-def load_pdf(file_path):
-    import fitz  # PyMuPDF
-    doc = fitz.open(file_path)
-    return "\n".join([page.get_text() for page in doc])
+```text
+file → loader → text → chunk → embedding → vector + graph
 ```
 
-### 🎯 Goal
+- added `IngestService.ingest_file(...)` entrypoint (reuse existing pipeline)
+- integrated with container and test system
+- added unit / integration / regression tests (all passed)
 
-Move from toy input → real-world ingestion. Enables evaluation on more realistic datasets.
+### 🎯 Design Principles
+- preprocessing layer only
+- unified output: plain text
+- no change to pipeline
+
+### 💡 Capability Upgrade
+- supports real-world document ingestion
+- enables multi-format input
+- no change to downstream retrieval logic
+
+👉 Key shift:raw text → real documents
+
+⚠️ Scope Boundaries
+- text-only PDF (no OCR)
+- no table / image parsing
 ---
 
 ## Day33–Day34 — Evaluation Module (🔥 Critical)

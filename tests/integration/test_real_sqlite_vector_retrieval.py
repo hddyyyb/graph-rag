@@ -12,6 +12,7 @@ from graph_rag.infra.adapters import (
 )
 from graph_rag.infra.observability.fake_trace import FakeTrace
 
+from tests.helpers import build_test_ingest_service, build_test_service
 
 def test_real_sqlite_vector_only_closed_loop(tmp_path):
     # 1) real sqlite backend
@@ -32,7 +33,7 @@ def test_real_sqlite_vector_only_closed_loop(tmp_path):
     trace = FakeTrace()
     post_processor = DefaultRetrievalPostProcessor()
     chunker = FixedLengthChunker()
-    ingest_service = IngestService(
+    ingest_service = build_test_ingest_service(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,
@@ -103,7 +104,7 @@ def test_real_sqlite_vector_top_k_closed_loop(tmp_path):
     trace = FakeTrace()
     post_processor = DefaultRetrievalPostProcessor()
 
-    ingest_service = IngestService(
+    ingest_service = build_test_ingest_service(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,
@@ -172,7 +173,7 @@ def test_real_sqlite_vector_min_score_closed_loop(tmp_path):
     trace = FakeTrace()
     post_processor = DefaultRetrievalPostProcessor()
 
-    ingest_service = IngestService(
+    ingest_service = build_test_ingest_service(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,

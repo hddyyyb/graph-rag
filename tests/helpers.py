@@ -14,6 +14,8 @@ from graph_rag.infra.adapters import (
     FixedClock,
 )
 
+from graph_rag.ports.document_loader import DocumentLoaderPort
+from graph_rag.infra.document_loaders.simple_document_loader import SimpleDocumentLoader
 
 from graph_rag.infra.observability.fake_trace import FakeTrace
 
@@ -61,6 +63,7 @@ def build_test_ingest_service(
     embedder: Optional[EmbeddingProviderPort] = None,
     trace: Optional[TracePort] = None,
     chunker: Optional[ChunkerPort] = None,
+    document_loader: Optional[DocumentLoaderPort] = None,
 ) -> IngestService:
     service = IngestService(
         vector_store= vector_store or InMemoryVectorStore(),
@@ -68,5 +71,6 @@ def build_test_ingest_service(
         embedder=embedder or FakeEmbeddingV2(),
         trace=trace or FakeTrace(),
         chunker=chunker or FixedLengthChunker(chunk_size=50, chunk_overlap=0),
+        document_loader=document_loader or SimpleDocumentLoader(),
     )
     return service

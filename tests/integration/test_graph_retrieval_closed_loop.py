@@ -12,7 +12,7 @@ from graph_rag.infra.adapters import (
     FixedLengthChunker,
 )
 from graph_rag.infra.observability.fake_trace import FakeTrace
-
+from tests.helpers import build_test_service, build_test_ingest_service
 
 def test_graph_retrieval_closed_loop_with_graph_only():
     
@@ -26,7 +26,7 @@ def test_graph_retrieval_closed_loop_with_graph_only():
     post_processor = DefaultRetrievalPostProcessor()
     chunker = FixedLengthChunker()
 
-    ingest_service = IngestService(
+    ingest_service = build_test_ingest_service(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,
