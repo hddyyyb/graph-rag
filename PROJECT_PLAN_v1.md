@@ -291,9 +291,7 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
 
 ---
 
-## Day30–Day31 — Chunking Optimization (🔥 Highest Priority)
-
-### Day30 — Strategy Implementation (Completed)
+## Day30–Day31 — Chunking Optimization
 
 - implement multiple chunking strategies:
 
@@ -305,8 +303,6 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
 - introduce Chunker abstraction (ChunkerPort)
 - integrate chunker into container
 - enable runtime strategy switching via Settings
-
-#### Day31 — Metadata & Quality Optimization (Completed)
 - extend Chunk metadata (minimal scope only):
 
 ```json
@@ -318,13 +314,6 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
   "section": null
 }
 ```
-- principles:
-  - minimal fields only
-  - no impact on core schema or downstream logic
-
-- metadata population:
-  - length: auto-computed
-  - section: reserved
 
 - added chunk quality observability:
   - chunk_count
@@ -333,19 +322,9 @@ The system has reached a **functional and engineering-stable GraphRAG stage**:
 
 - added ingest-level tests for chunk quality
 
-### 🎯 Goal
-
-- improve retrieval quality via better chunking
-- enable chunk-level observability
-
-Key shift:
-chunking → from preprocessing → to optimizable component
-
 ---
 
 ## Day32 — Multi-format Document Support(Completed)
-
-### ✅ Completed
 
 - introduced DocumentLoader abstraction(`DocumentLoaderPort`, `SimpleDocumentLoader`)
 - supported input formats: TXT / PDF / DOCX
@@ -359,18 +338,6 @@ file → loader → text → chunk → embedding → vector + graph
 - integrated with container and test system
 - added unit / integration / regression tests (all passed)
 
-### 🎯 Design Principles
-- preprocessing layer only
-- unified output: plain text
-- no change to pipeline
-
-### 💡 Capability Upgrade
-- supports real-world document ingestion
-- enables multi-format input
-- no change to downstream retrieval logic
-
-👉 Key shift:raw text → real documents
-
 ⚠️ Scope Boundaries
 - text-only PDF (no OCR)
 - no table / image parsing
@@ -378,31 +345,35 @@ file → loader → text → chunk → embedding → vector + graph
 
 ## Day33–Day34 — Evaluation Module (🔥 Critical)
 
-### Tasks
+### Day33 — Core Evaluation (Completed)
 
-Implement metrics:
+#### Done
 
 ```text
-Recall@K
-MRR
+- Recall@K / MRR implemented
+- EvalSample / EvalResult / EvalSummary defined
+- evaluate_sample / evaluate_dataset implemented
+- support vector / graph / hybrid modes
+- metrics / runner / dataset tests passed
 ```
+### Day34 — Real Benchmark
 
-Example:
+### Tasks
+- build 3~5 EvalSample (real query + real chunk_id)
+- run evaluation (vector / graph / hybrid)
+- compute avg Recall@K & MRR
+- compare results
 
-```python
-def recall_at_k(retrieved, relevant, k):
-    return len(set(retrieved[:k]) & set(relevant)) / len(relevant)
-```
+### Constraints
 
-### Dataset
-
-- build small benchmark manually
+- no retrieval changes
+- no fake chunk_id
+- small dataset only
 
 ### 🎯 Goal
 
-Quantify retrieval performance.
-Enables quantitative comparison of:
-- vector vs graph vs hybrid retrieval
+Quantify retrieval performance and compare:
+vector vs graph vs hybrid
 
 ---
 
