@@ -27,23 +27,32 @@ class SQLiteVectorStore:
         """)
         self._conn.commit()
     
-    def upsert(self, doc_id: str, chunks: List[str], embeddings: List[List[float]]) -> None:
+    def upsert(
+        self, 
+        doc_id: str, 
+        chunk_ids: List[str],
+        chunks: List[str], 
+        embeddings: List[List[float]]
+        ) -> None:
         # 1. Validate that lengths match
-        if len(chunks) != len(embeddings):
-            raise ValueError(f"chunks and embeddings length mismatch: {len(chunks)} != {len(embeddings)}")
+        if not (len(chunk_ids) == len(chunks) == len(embeddings)):
+            raise ValueError(
+                f"chunk_ids, chunks and embeddings length mismatch: "
+                f"{len(chunk_ids)} != {len(chunks)} != {len(embeddings)}"
+            )        
         # 2. Remove existing data for this document
         self._conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
         # Batch execution (executed internally by the database)
 
         # 3. Insert new data (using executemany)
         rows = []
-        for i in range(len(chunks)):
-            chunk_id = f"{doc_id}#{i}"
-            row = (doc_id, chunk_id, chunks[i], json.dumps(embeddings[i]))  
-            # json.dumps(): converts Python objects to JSON strings
+        for chunk_id, text, embedding in zip(chunk_ids, chunks, embeddings):
+            row = (doc_id, chunk_id, text, json.dumps(embedding))
             rows.append(row)
             
-        self._conn.executemany("INSERT INTO chunks (doc_id, chunk_id, text, embedding) VALUES (?, ?, ?, ?)", rows)
+        self._conn.executemany(
+            "INSERT INTO chunks (doc_id, chunk_id, text, embedding) VALUES (?, ?, ?, ?)", 
+            rows)
         
         # 4. Commit changes
         self._conn.commit()

@@ -26,6 +26,7 @@ class VectorStorePort(Protocol):
             self, 
             doc_id: str, 
             chunks: List[str], 
+            chunk_ids: List[str],
             embeddings: List[List[float]]
             ) -> None:
         ...

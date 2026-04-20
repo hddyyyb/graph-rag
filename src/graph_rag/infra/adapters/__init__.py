@@ -1,5 +1,3 @@
-from .milvus_store import InMemoryVectorStore
-
 from .llamaindex_kernel import SimpleKernel
 from .simple_rag_kernel import SimpleRAGKernel
 from .fake_kernel import FakeKernel
@@ -12,7 +10,9 @@ from .in_memory_graph_store import InMemoryGraphStore
 from .neo4j_graph_store import Neo4jGraphStore
 
 from .clock import SystemClock, FixedClock
+
 from .sqlite_vector_store import SQLiteVectorStore
+from .milvus_store import InMemoryVectorStore
 
 from .fake_llm import FakeLLM
 from .local_llm import LocalLLM

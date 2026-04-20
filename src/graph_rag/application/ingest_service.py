@@ -103,11 +103,15 @@ class IngestService:    # 文档入库的业务流程控制器
         )
         self.trace.event("ingest_start", chunks=len(chunks))
 
-
+        chunk_ids = [chunk.chunk_id for chunk in chunks]
         chunk_texts = [chunk.text for chunk in chunks]
         embeddings = self.embedder.embed_texts(chunk_texts)    # IngestServices初始化时候传入embedder，代码中写的是接口/父类
-        self.vector_store.upsert(doc_id, chunk_texts, embeddings)    # 调用VectorStore写入向量
-        
+        self.vector_store.upsert(
+            doc_id=doc_id,
+            chunk_ids=chunk_ids,
+            chunks=chunk_texts,
+            embeddings=embeddings,
+        )# 调用VectorStore写入向量
 
         graph_records: List[ChunkGraphRecord] = []
 

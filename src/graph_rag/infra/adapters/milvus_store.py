@@ -8,12 +8,6 @@ from graph_rag.domain.models import RetrievedChunk
 from graph_rag.ports.vector_store import VectorStorePort, SearchOptions, normalize_search_options
 
 
-'''
-InMemoryVectorStore保存(doc_id, chunk_id) -> (text, embedding)
-search()用cosine相似度做top_k检索
-目的：先把“向量写入+向量检索”链路跑通
-Day3换成真正Milvus适配器。
-'''
 def _cosine(a: List[float], b: List[float]) -> float:
     dot = 0.0
     na = 0.0
@@ -29,17 +23,25 @@ def _cosine(a: List[float], b: List[float]) -> float:
 
 
 class InMemoryVectorStore(VectorStorePort):
-    """
-    Day2代替Milvus的内存向量库，接口保持一致，便于Day3替换。
-    """
 
     def __init__(self) -> None:
         # key: (doc_id, chunk_id) -> (text, embedding)
         self._data: Dict[Tuple[str, str], Tuple[str, List[float]]] = {}
 
-    def upsert(self, doc_id: str, chunks: List[str], embeddings: List[List[float]]) -> None:
-        for idx, (txt, emb) in enumerate(zip(chunks, embeddings)):
-            chunk_id = f"c{idx}"
+    def upsert(
+        self, 
+        doc_id: str, 
+        chunk_ids: List[str],
+        chunks: List[str], 
+        embeddings: List[List[float]]
+        ) -> None:
+        if not (len(chunk_ids) == len(chunks) == len(embeddings)):
+            raise ValueError(
+                f"chunk_ids, chunks and embeddings length mismatch: "
+                f"{len(chunk_ids)} != {len(chunks)} != {len(embeddings)}"
+            )
+
+        for chunk_id, txt, emb in zip(chunk_ids, chunks, embeddings):
             self._data[(doc_id, chunk_id)] = (txt, emb)
 
     def search(

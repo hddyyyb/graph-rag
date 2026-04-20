@@ -345,39 +345,56 @@ file → loader → text → chunk → embedding → vector + graph
 
 ## Day33–Day34 — Evaluation Module (🔥 Critical)
 
-### Day33 — Core Evaluation (Completed)
+### Day33 — Metrics & Framework
 
-#### Done
+- implement metrics:` Recall@K / MRR implemented `
+- define evaluation structures: `EvalSample / EvalResult / EvalSummary`
+- implement evaluation runner: `evaluate_dataset(mode = vector / graph / hybrid)`
 
+### Day34 — Real Benchmark Validation
+
+- build small real dataset (English)
+align: ` query ↔ relevant_chunk_ids `
+- run evaluation: `vector / graph / hybrid comparison`
+Results:
 ```text
-- Recall@K / MRR implemented
-- EvalSample / EvalResult / EvalSummary defined
-- evaluate_sample / evaluate_dataset implemented
-- support vector / graph / hybrid modes
-- metrics / runner / dataset tests passed
+Vector:
+- Recall@3 = 0.50
+- MRR = 0.50
+
+Graph:
+- Recall@3 = 0.67
+- MRR = 0.83
+
+Hybrid:
+- Recall@3 = 0.67
+- MRR = 0.83
 ```
-### Day34 — Real Benchmark
-
-### Tasks
-- build 3~5 EvalSample (real query + real chunk_id)
-- run evaluation (vector / graph / hybrid)
-- compute avg Recall@K & MRR
-- compare results
-
-### Constraints
-
-- no retrieval changes
-- no fake chunk_id
-- small dataset only
-
-### 🎯 Goal
-
-Quantify retrieval performance and compare:
-vector vs graph vs hybrid
+Key Findings:
+graph retrieval works under proper term extraction
+graph outperforms vector on current dataset
+hybrid is dominated by graph signal
+Chinese failure traced to term extraction mismatch
 
 ---
+## Day35 — Retrieval Error Analysis (Next)
+- analyze per-query retrieval behavior:
+```text
+- false positives
+- false negatives
+```
+- enhance debug observability:
+```text
+- per-chunk score breakdown
+- vector vs graph contribution
+```
+- compare retrieval modes:
+```text
+vector vs graph vs hybrid
+```
 
-## Day35–Day36 — Vector Database Upgrade
+---
+## Day36-Day37 — Vector Database Upgrade
 
 ### Options
 
@@ -399,7 +416,7 @@ Upgrade system to production-level infra. Improves retrieval efficiency but does
 
 ---
 
-## Day37+ — Final Packaging
+## Day38+ — Final Packaging
 
 ### Tasks
 

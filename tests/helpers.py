@@ -6,13 +6,23 @@ from graph_rag.application.query_service import QueryService
 from graph_rag.infra.adapters import (
     DefaultRetrievalPostProcessor,
     FakeEmbeddingV2,
+    SentenceTransformerEmbeddingProvider,
     FakeKernel,
+    SimpleKernel,
+    SimpleRAGKernel,
     InMemoryGraphStore,
+    Neo4jGraphStore,
     InMemoryVectorStore,
+    SQLiteVectorStore,
     FixedLengthChunker,
     RecursiveChunker,
     FixedClock,
+    SystemClock,
+    FakeLLM,
+    LocalLLM,
+    OpenAILLM,
 )
+
 
 from graph_rag.ports.document_loader import DocumentLoaderPort
 from graph_rag.infra.document_loaders.simple_document_loader import SimpleDocumentLoader
@@ -55,6 +65,27 @@ def build_test_service(
         graph_top_k=graph_top_k,
     )
 
+def build_basic_query_service(
+    *,
+    vector_store: Optional[VectorStorePort] = None,
+    graph_store: Optional[GraphStorePort] = None,
+    embedder: Optional[EmbeddingProviderPort] = None,
+    kernel: Optional[RAGKernelPort] = None,
+    post_processor: Optional[RetrievalPostProcessorPort] = None,
+    trace: Optional[TracePort] = None,
+    vector_top_k: int = 5,
+    graph_top_k: int = 5,
+) -> QueryService:
+    return QueryService(
+        vector_store=vector_store or InMemoryVectorStore(),
+        graph_store=graph_store or InMemoryGraphStore(),
+        embedder=embedder or SentenceTransformerEmbeddingProvider(),
+        kernel=kernel or SimpleKernel(),
+        post_processor=post_processor or DefaultRetrievalPostProcessor(),
+        trace=trace or FakeTrace(),
+        vector_top_k=vector_top_k,
+        graph_top_k=graph_top_k,
+    )
 
 def build_test_ingest_service(
     *,
