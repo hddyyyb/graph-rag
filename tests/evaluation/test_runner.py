@@ -64,3 +64,6 @@ def test_evaluate_sample_invalid_mode_raises():
     import pytest
     with pytest.raises(ValueError):
         evaluate_sample(sample, service, mode="unknown", k=3)
+
+
+

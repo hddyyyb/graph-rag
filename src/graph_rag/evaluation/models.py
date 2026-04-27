@@ -1,6 +1,6 @@
 # models.py 放数据结构
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List, Optional
 
 @dataclass
 class EvalSample:
@@ -14,6 +14,10 @@ class EvalResult:
     retrieved_chunk_ids: List[str]
     recall_at_k: float
     mrr: float
+    relevant_chunk_ids: List[str]
+    relevant_ranks: Dict[str, Optional[int]]
+    false_negatives: List[str]
+    false_positives: List[str]
 
 @dataclass
 class EvalSummary:

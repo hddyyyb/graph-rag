@@ -377,21 +377,37 @@ hybrid is dominated by graph signal
 Chinese failure traced to term extraction mismatch
 
 ---
-## Day35 — Retrieval Error Analysis (Next)
-- analyze per-query retrieval behavior:
+## Day35 — Retrieval Error Analysis (Completed)
+
+### Completed
+
+- extended evaluation with case-level error analysis:
 ```text
-- false positives
-- false negatives
+- relevant_chunk_ids
+- relevant_ranks
+- false_negatives
+- false_positives
 ```
-- enhance debug observability:
+- implemented error analysis logic in `evaluate_sample`
+- added dedicated tests (test_error_analysis.py) covering:
 ```text
-- per-chunk score breakdown
-- vector vs graph contribution
+- full hit
+- partial hit
+- full miss
+- empty retrieval
 ```
-- compare retrieval modes:
-```text
-vector vs graph vs hybrid
-```
+- added human-readable analysis script:
+`src/graph_rag/evaluation/run_case_analysis.py`
+- verified on real benchmark dataset
+
+### Key Findings
+- Graph retrieval reduces false negatives compared to Vector
+- Hybrid results are currently close to Graph (graph-dominated fusion)
+- Graph introduces some false positives due to broad term expansion
+
+### Outcome
+The system now supports explainable retrieval evaluation at case level,
+enabling systematic diagnosis of retrieval failures and guiding future optimization.
 
 ---
 ## Day36-Day37 — Vector Database Upgrade

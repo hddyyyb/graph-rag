@@ -55,14 +55,25 @@ def evaluate_sample(
     # 3. compute metrics
     recall = recall_at_k(retrieved_chunk_ids, sample.relevant_chunk_ids, k)
     reciprocal_rank = mrr(retrieved_chunk_ids, sample.relevant_chunk_ids)
-    
-    # 4. build evaluation result
+
+    # 4. compute case-level error analysis fields
+    rank_lookup = {cid: i + 1 for i, cid in enumerate(retrieved_chunk_ids)}
+    relevant_set = set(sample.relevant_chunk_ids)
+    relevant_ranks = {cid: rank_lookup.get(cid) for cid in sample.relevant_chunk_ids}
+    false_negatives = [cid for cid in sample.relevant_chunk_ids if cid not in rank_lookup]
+    false_positives = [cid for cid in retrieved_chunk_ids if cid not in relevant_set]
+
+    # 5. build evaluation result
     return EvalResult(
         mode=mode,
         query=sample.query,
         retrieved_chunk_ids=retrieved_chunk_ids,
         recall_at_k=recall,
         mrr=reciprocal_rank,
+        relevant_chunk_ids=sample.relevant_chunk_ids,
+        relevant_ranks=relevant_ranks,
+        false_negatives=false_negatives,
+        false_positives=false_positives,
     )
     
 def evaluate_dataset(
