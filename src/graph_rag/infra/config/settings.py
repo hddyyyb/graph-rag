@@ -22,7 +22,7 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
     # backend selectors
 
     embedding_backend: Literal["sentence_transformer", "fake", "hash"] = "sentence_transformer"   # sentence_transformer | fake | hash
-    vector_store_backend: Literal["memory", "sqlite"] = "sqlite"    # memory | sqlite
+    vector_store_backend: Literal["memory", "sqlite", "qdrant"] = "qdrant"    # memory | sqlite | qdrant
     graph_store_backend: Literal["memory", "neo4j"] = "neo4j"      # memory | neo4j
     llm_backend: Literal["fake", "local", "openai"] = "fake"        # fake | local | openai
     
@@ -33,6 +33,11 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
 
     # sqlite
     sqlite_path: str = ":memory:"
+
+    # qdrant
+    qdrant_host: str = "localhost"
+    qdrant_port: int = Field(default=6333, ge=1)
+    qdrant_collection_name: str = "graph_rag"
 
     # 把Graph Retrieval V2也纳入统一配置系统
     graph_expand_hops: int = 1
@@ -93,6 +98,9 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
 
         if self.vector_store_backend == "sqlite" and not self.sqlite_path:  # 如果你选了 sqlite，就必须提供路径
             raise ValueError("sqlite backend requires sqlite_path")
+
+        if self.vector_store_backend == "qdrant" and not self.qdrant_host:
+            raise ValueError("qdrant backend requires qdrant_host")
 
         if self.graph_store_backend == "neo4j":
             required = [

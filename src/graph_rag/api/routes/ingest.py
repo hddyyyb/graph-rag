@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 
 from graph_rag.api.schemas.ingest import IngestRequest, IngestResponse
 from graph_rag.application.ingest_service import IngestService
@@ -37,7 +39,27 @@ def ingest(
     return IngestResponse(doc_id=res.doc_id, chunks=res.chunks, trace_id=trace.get_trace_id())
 
 
+@router.post("/ingest/file", response_model=IngestResponse)
+async def ingest_file(
+    doc_id: str,
+    file: UploadFile = File(...),
+    svc: IngestService = Depends(get_ingest_service),
+    trace: TracePort = Depends(get_trace),
+) -> IngestResponse:
+    suffix = Path(file.filename or "").suffix
 
+    with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    res = svc.ingest_file(doc_id=doc_id, file_path=tmp_path)
+
+    return IngestResponse(
+        doc_id=res.doc_id,
+        chunks=res.chunks,
+        trace_id=trace.get_trace_id(),
+    )
 '''
 类型检测发生在
     payload: IngestRequest

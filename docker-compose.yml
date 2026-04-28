@@ -1,0 +1,28 @@
+services:                     # 定义要启动哪些服务。这里的服务就是容器
+  neo4j:                      # 定义名为neo4j的服务。后面可以用：docker compose up -d neo4j
+    image: neo4j:5.26-community    # 使用Neo4j 5.26社区版镜像
+    container_name: graphrag-neo4j # 容器名字固定为graphrag-neo4j，方便以后查看和管理
+    ports:
+      - "7474:7474"           # Web UI端口
+      - "7687:7687"           # Bolt协议端口（给Python用）
+    environment:
+      NEO4J_AUTH: neo4j/00000000
+    volumes:                  # 挂载数据卷
+      - neo4j_data:/data      # 把Neo4j数据库数据保存到Docker卷里,这样即使容器删了，只要卷还在，数据还可以保留
+      - neo4j_logs:/logs      # 保存Neo4j日志
+    restart: unless-stopped
+
+  qdrant:                     # 向量数据库
+    image: qdrant/qdrant:latest
+    container_name: graphrag-qdrant
+    ports:
+      - "6333:6333"           # HTTP API端口，Python客户端常用它, QDRANT_URL=http://localhost:6333
+      - "6334:6334"           # 6334通常是gRPC端口，后面高性能场景可能会用
+    volumes:                  # 把Qdrant的数据保存到Docker卷qdrant_data中。否则容器删除后，向量数据可能丢失
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped   # 除非手动停止，否则自动重启
+
+volumes:                      # 定义Docker管理的数据卷。
+  neo4j_data:                 # -> Neo4j数据库数据
+  neo4j_logs:                 # -> Neo4j日志
+  qdrant_data:                # -> Qdrant向量数据

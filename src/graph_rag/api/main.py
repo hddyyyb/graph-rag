@@ -136,6 +136,13 @@ def build_container(settings: Settings) -> Dict[str, Any]:
         if not sqlite_path:
             raise ValueError("sqlite backend requires sqlite_path")
         vector_store = SQLiteVectorStore(sqlite_path)
+    elif vector_store_backend == "qdrant":
+        from graph_rag.infra.adapters.qdrant_vector_store import QdrantVectorStore
+        vector_store = QdrantVectorStore(
+            host=settings.qdrant_host,
+            port=settings.qdrant_port,
+            collection_name=settings.qdrant_collection_name,
+        )
     else:
         vector_store = InMemoryVectorStore()
     

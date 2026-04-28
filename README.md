@@ -148,7 +148,7 @@ docker compose up -d
 ### 3. Start API
 
 ```bash
-docker start neo4j-local
+docker start neo4j-local  # tmp method to start Neo4j container
 uvicorn graph_rag.api.main:app --reload --port 8000
 ```
 

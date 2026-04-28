@@ -410,36 +410,117 @@ The system now supports explainable retrieval evaluation at case level,
 enabling systematic diagnosis of retrieval failures and guiding future optimization.
 
 ---
-## Day36-Day37 — Vector Database Upgrade
 
-### Options
+## Day36-Day37 — Qdrant Vector Database & Docker Infra Upgrade
 
-- Qdrant (recommended)
-- Milvus (more industrial)
+### Updated Status
 
-### Tasks
+- graph_store_backend = memory | neo4j
+- vector_store_backend = memory | sqlite | qdrant
+- Docker infra unified via docker-compose:
+  - Neo4j (Docker)
+  - Qdrant (Docker)
 
-- implement new VectorStore
-- integrate into container
 
+### ✅ Day36 — Infra Integration (Completed)
+
+#### Completed
+
+- introduced docker-compose.yml:
+```text
+- unified Neo4j + Qdrant container management
+- replaced manual docker start with docker compose
+```
+- extended Settings:
 ```text
 vector_store_backend = memory | sqlite | qdrant
+qdrant_host / qdrant_port / qdrant_collection_name added
 ```
 
-### 🎯 Goal
+- implemented QdrantVectorStore:
+```text
+- upsert (with doc-level overwrite)
+- search (cosine similarity)
+- payload: doc_id / chunk_id / text
+- deterministic point_id via uuid5
+```
+- integrated into composition root (main.py):
+```text
+- lazy import QdrantVectorStore
+- no impact on existing backends
+```
+- added integration test (Docker Qdrant):
+```text
+- upsert + search works
+- retrieval result verified
+```
+- added file ingestion API:
+```text
+POST /ingest/file
+- UploadFile support
+- temp file handling
+- reuse IngestService.ingest_file
+```
 
-Upgrade system to production-level infra. Improves retrieval efficiency but does not change retrieval quality.
+## Day37 — Validation & Positioning
+
+### Tasks
+1. Backend Comparison (SQLite vs Qdrant)
+- run same queries on sqlite / qdrant
+- compare Recall@K / MRR (small dataset)
+- analyze latency difference
+2. Retrieval Behavior Analysis
+- observe vector score distribution
+- verify ranking stability
+- inspect edge cases (empty results / low similarity)
+3. Interview Preparation
+- explain:
+  - why SQLite is not enough
+  - why Qdrant is chosen
+  - when Milvus is needed
+- prepare system design explanation:
+  - vector store abstraction
+  - pluggable backend design
+4. Engineering Polishing
+- clean test data / collections
+- ensure reproducible demo dataset
+- finalize API usage flow
+
+## Goal
+
+Upgrade from: FastAPI + Neo4j + SQLite
+to: FastAPI + Neo4j + Qdrant (Docker-managed, pluggable backend)
+
+with:
+- unified infra
+- scalable vector storage
+- production-ready ingestion pipeline
+---
+
+## Day38 — Final Packaging
+
+### Tasks
+- optimize README (project positioning + quick start + architecture)
+- add system design diagram (architecture + retrieval pipeline)
+- provide API examples (/ingest /query + sample response)
+- document scoring logic (vector + graph)
 
 ---
 
-## Day38+ — Final Packaging
+## Day39 — Interview Preparation
 
 ### Tasks
-
-- README optimization
-- system design diagram
-- API demo
-- interview preparation
+- prepare project explanation (3 min / 10 min)
+- prepare trade-offs:
+  - vector vs graph
+  - SQLite vs Qdrant
+  - why not Milvus
+- prepare common interview questions:
+  - system design explanation
+  - retrieval pipeline
+  - scoring design
+  - error analysis
+- refine resume project description
 
 ---
 
