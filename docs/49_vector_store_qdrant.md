@@ -175,3 +175,89 @@ Current implementation:
 - hybrid retrieval optimization  
 - performance benchmarking  
 - distributed deployment  
+
+## Validation & Engineering Notes (Day37)
+
+### Backend Comparison (SQLite vs Qdrant)
+
+Both backends were evaluated using the same dataset and evaluation samples.
+
+Result:
+
+```text
+SQLite:
+Recall@3 = 1.0000
+MRR = 1.0000
+Latency ≈ 25ms
+
+Qdrant:
+Recall@3 = 1.0000
+MRR = 1.0000
+Latency ≈ 38ms
+```
+
+Observation:
+
+- Retrieval quality is identical on small datasets.
+- Qdrant has slightly higher latency due to service-based architecture.
+- Differences will appear at larger scale (ANN vs brute-force).
+
+---
+
+### Retrieval Behavior
+
+Observations:
+
+- top_k results are stable across repeated runs
+- relevant queries rank correct chunks at top1
+- score shows clear separation between relevant and irrelevant results
+- unrelated queries still return top_k results with low or negative scores
+
+Implication:
+
+- post-processing may require min_score filtering
+
+### Engineering Issues
+
+#### Chunk ID mismatch
+
+Evaluation samples must match actual chunk ID format:
+
+```text
+{doc_id}#0
+```
+
+#### Vector Dimension Mismatch
+
+Qdrant enforces fixed vector dimension:
+
+- sentence-transformer: 384
+- hash embedding: 32
+
+Mismatch leads to insertion failure.
+
+#### Collection pollution
+
+Old data remained in collection caused unexpected results.
+
+Solution:
+
+- use isolated collection for evaluation
+- reset collection before experiments
+
+### Collection Management Strategy
+
+Qdrant collections are persistent and must be managed explicitly.
+
+Recommended:
+
+```text
+dev:
+  graphrag_dev
+
+eval:
+  graphrag_eval (reset before evaluation)
+
+prod:
+  graphrag_prod (doc-level overwrite)
+```

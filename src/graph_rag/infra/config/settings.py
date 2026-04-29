@@ -37,7 +37,7 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
     # qdrant
     qdrant_host: str = "localhost"
     qdrant_port: int = Field(default=6333, ge=1)
-    qdrant_collection_name: str = "graph_rag"
+    qdrant_collection_name: str = "graphrag_dev"
 
     # 把Graph Retrieval V2也纳入统一配置系统
     graph_expand_hops: int = 1
@@ -72,7 +72,6 @@ class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
     2. 变成 "sqlite"
     3. 再做类型校验'''
     @field_validator(
-        "log_level",
         "embedding_backend",
         "graph_store_backend",
         "vector_store_backend",

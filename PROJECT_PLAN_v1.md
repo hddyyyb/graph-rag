@@ -465,62 +465,103 @@ POST /ingest/file
 ## Day37 — Validation & Positioning
 
 ### Tasks
+
 1. Backend Comparison (SQLite vs Qdrant)
 - run same queries on sqlite / qdrant
 - compare Recall@K / MRR (small dataset)
 - analyze latency difference
+
 2. Retrieval Behavior Analysis
 - observe vector score distribution
 - verify ranking stability
 - inspect edge cases (empty results / low similarity)
-3. Interview Preparation
-- explain:
-  - why SQLite is not enough
-  - why Qdrant is chosen
-  - when Milvus is needed
-- prepare system design explanation:
-  - vector store abstraction
-  - pluggable backend design
+
+3. Infrastructure Validation
+- verify Qdrant integration correctness
+- ensure VectorStore abstraction consistency
+- confirm backend switching via Settings
+
 4. Engineering Polishing
 - clean test data / collections
-- ensure reproducible demo dataset
-- finalize API usage flow
+- define collection lifecycle strategy (dev / eval / prod)
+- ensure reproducible evaluation dataset
+
+5. Documentation Integration
+- integrate validation results into infra documentation
+- update 49_vector_store_qdrant.md
 
 ## Goal
 
 Upgrade from: FastAPI + Neo4j + SQLite
+
 to: FastAPI + Neo4j + Qdrant (Docker-managed, pluggable backend)
 
 with:
-- unified infra
-- scalable vector storage
-- production-ready ingestion pipeline
+
+- unified infrastructure
+- service-based vector retrieval
+- production-oriented data management
 ---
 
-## Day38 — Final Packaging
+## Day38 — System Understanding (Core)
 
 ### Tasks
-- optimize README (project positioning + quick start + architecture)
-- add system design diagram (architecture + retrieval pipeline)
-- provide API examples (/ingest /query + sample response)
-- document scoring logic (vector + graph)
+
+1. Query Flow Analysis
+- trace QueryService.query() end-to-end
+- understand:
+  - embedding
+  - vector retrieval
+  - graph retrieval
+  - fusion
+  - post-processing
+
+2. Retrieval Pipeline Breakdown
+- map each step to actual code
+- identify where:
+  - score is computed
+  - results are merged
+  - debug info is injected
+
+3. Controlled Modification
+- make one small change:
+  - adjust fusion weight OR
+  - add min_score filter
+- observe impact on retrieval results
+
+4. Internal Documentation
+- document query execution flow
+- align understanding with existing docs structure
+- avoid creating standalone notes (integrate into docs)
 
 ---
 
-## Day39 — Interview Preparation
+## Goal
+
+- fully understand retrieval execution path
+- gain confidence in modifying core pipeline
+- move from "can use" → "can control"
+
+---
+
+## Day39 — Retrieval Optimization (Optional)
 
 ### Tasks
-- prepare project explanation (3 min / 10 min)
-- prepare trade-offs:
-  - vector vs graph
-  - SQLite vs Qdrant
-  - why not Milvus
-- prepare common interview questions:
-  - system design explanation
-  - retrieval pipeline
-  - scoring design
-  - error analysis
-- refine resume project description
+
+- experiment with fusion weights (vector vs graph)
+- test min_score filtering
+- analyze failure cases from evaluation
+- explore improvement directions:
+  - better chunking
+  - term extraction
+  - graph expansion
+
+---
+
+## Goal
+
+- understand retrieval limitations
+- identify real improvement directions
 
 ---
 
