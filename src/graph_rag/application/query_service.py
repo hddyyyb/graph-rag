@@ -115,8 +115,10 @@ class QueryService:
             合并分数
             重新构造新对象
         '''
-        alpha = self.fusion_alpha
-        beta = self.fusion_beta
+        alpha = self.fusion_alpha   # 原始权重（暂时注释）
+        beta  = self.fusion_beta
+        # alpha = 0.8   # 临时调整：向量分保持全权
+        # beta  = 0.5   # 临时调整：图分降权，观察排序变化
 
         merged: dict[tuple[str, str], dict] = {}
 

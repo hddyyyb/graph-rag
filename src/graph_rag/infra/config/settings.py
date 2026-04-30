@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
-
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Literal用于明确限制变量、参数或返回值只能是特定的几个字面值
 
-class Settings(BaseModel):    # 定义整个GraphRAG系统的配置对象
+class Settings(BaseSettings):    # 定义整个GraphRAG系统的配置对象
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
     app_name: str = "graph-rag"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     

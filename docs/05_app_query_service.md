@@ -34,6 +34,69 @@ Query
 → Build retrieval_debug
 ```
 
+### QueryService.query Detailed Execution Flow (method-level)
+
+QueryService.query is the application-layer orchestration entrypoint.
+
+It does not implement embedding, vector search, graph search, or post-processing algorithms directly.
+Instead, it coordinates these components through ports and infra implementations.
+
+Execution flow:
+
+```text
+query()
+  ↓
+validate query and normalize options
+  ↓
+qemb = self.embedder.embed_query(q)
+  ↓
+_retrieve_chunks(...)
+  ├─ vector_store.search(...)
+  └─ graph_store.search(...)
+  ↓
+_fuse_chunks(vector_chunks, graph_chunks)
+  ↓
+_postprocess_chunks(...)
+  └─ self.post_processor.process(chunks, top_k, min_score)
+  ↓
+_generate_answer_text(...)
+  ↓
+_build_answer(...)
+  ├─ _build_retrieval_debug(...)
+  ├─ citations
+  └─ Answer(...)
+```
+Key understanding:
+
+- vector score is computed inside VectorStore implementation
+- graph score is computed inside GraphStore implementation
+- fusion happens in QueryService._fuse_chunks
+- min_score / top_k filtering happens in post_processor.process
+- retrieval_debug is assembled when building the final Answer
+- QueryService is responsible for orchestration, not low-level retrieval algorithm implementation
+
+
+### Fusion Behavior Observation
+
+Experiment setup:
+- doc1: graph-strong
+- doc2: vector-strong
+- query: transformer
+
+Observation:
+
+alpha=0.5, beta=0.5:
+- graph-dominant chunk ranks higher
+
+alpha=1.0, beta=0.1:
+- vector-dominant chunk ranks higher
+
+Conclusion:
+- fusion weights directly control ranking behavior
+- lowering beta reduces graph influence
+- increasing alpha prioritizes semantic similarity
+For detailed execution order, see the method-level flow in Section 9–13.
+
 ## 3. Constructor Dependencies
 
 `QueryService` depends only on Ports and domain-layer objects.
@@ -426,57 +489,7 @@ Expected semantic content includes:
 
 ---
 
-## 15. Execution Sequence
-
-1. normalize options   
-    Call `normalize_query_options(...)`.
-2. validate query  
-    Reject empty query.
-3. resolve top_k  
-    Compute retrieval and final output `top_k`.
-4. init timings/stats  
-    Prepare observability state.
-5. trace start  
-    Trace contains query context and effective retrieval settings.
-6. embed query  
-    Call `embedder.embed_query(...)`.
-7. retrieve vector and graph chunks  
-    Call `_retrieve_chunks(...)`.
-8. Update retrieval counts  
-    Populate vector and graph counts.
-9. fuse  
-    Call `_fuse_chunks(...)`.
-10. postprocess  
-    Call `_postprocess_chunks(...)`.
-11. generate  
-    Call `_generate_answer_text(...)`.
-12. build answer  
-    Call `_build_answer(...)`.
-
----
-
-## 16. Observability
-
-Events:
-
-- query_start
-- vector_retrieved
-- graph_retrieved
-- retrieval_timing
-- query_failed
-- query_done
-
-retrieval_debug explains:
-
-- vector hits
-- graph hits
-- fusion behavior
-- timings
-- counts
-
----
-
-## 17. Design Strengths
+## 15. Design Strengths
 
 #### Backend-agnostic orchestration
 
@@ -497,7 +510,7 @@ Most methods are deterministic and Port-based, which makes service-level tests e
 
 ---
 
-## 18. Scope Boundary
+## 16. Scope Boundary
 
 Not included:
 

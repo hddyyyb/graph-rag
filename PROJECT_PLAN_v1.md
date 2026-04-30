@@ -503,44 +503,48 @@ with:
 - production-oriented data management
 ---
 
-## Day38 — System Understanding (Core)
+## Day38 — System Understanding (Core) ✅ Completed
 
-### Tasks
+### Completed
 
-1. Query Flow Analysis
-- trace QueryService.query() end-to-end
-- understand:
+- traced QueryService.query() end-to-end execution flow
+- mapped each pipeline stage to actual code:
   - embedding
   - vector retrieval
   - graph retrieval
   - fusion
   - post-processing
+- identified score computation:
+  - vector_score → VectorStore
+  - graph_score → GraphStore
+  - final_score → QueryService._fuse_chunks
+- identified merge point:
+  - vector + graph results merged in _fuse_chunks
+- identified debug injection:
+  - retrieval_debug assembled in _build_answer
 
-2. Retrieval Pipeline Breakdown
-- map each step to actual code
-- identify where:
-  - score is computed
-  - results are merged
-  - debug info is injected
+### Key Understanding
 
-3. Controlled Modification
-- make one small change:
-  - adjust fusion weight OR
-  - add min_score filter
-- observe impact on retrieval results
+- QueryService is an orchestration layer (no algorithm implementation)
+- Graph retrieval performs term expansion based on co-occurrence
+- retrieval results depend on both:
+  - semantic similarity (vector)
+  - structural signals (graph)
 
-4. Internal Documentation
-- document query execution flow
-- align understanding with existing docs structure
-- avoid creating standalone notes (integrate into docs)
+### Experiment
 
----
+- constructed vector-strong vs graph-strong samples
+- verified fusion behavior:
 
-## Goal
+```text
+alpha=0.5, beta=0.5 → graph-dominant ranking
+alpha=1.0, beta=0.1 → vector-dominant ranking
+```
 
-- fully understand retrieval execution path
-- gain confidence in modifying core pipeline
-- move from "can use" → "can control"
+### Outcome
+- achieved full understanding of retrieval pipeline
+- gained ability to control ranking via fusion weights
+- upgraded from "system user" → "system controller"
 
 ---
 
