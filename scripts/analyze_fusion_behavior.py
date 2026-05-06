@@ -1,26 +1,4 @@
-"""
-它其实属于: evaluation模块的“官方分析入口”
-类似: python -m graph_rag.evaluation.run_case_analysis
-
-Human-readable case-level error analysis script.
-
-Run from the project root:
-    python -m graph_rag.evaluation.run_case_analysis
-
-Text and samples are copied from tests/evaluation/test_eval_real_benchmark.py
-so this script stays self-contained without importing from test files.
-"""
-import sys
-import os
-
-# Ensure both src/ and the project root are on sys.path so that
-# graph_rag.* and tests.* are importable when running this script directly.
-_here = os.path.dirname(os.path.abspath(__file__))
-_project_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
-_src_root = os.path.join(_project_root, "src")
-for _p in (_src_root, _project_root):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+# 复用 src/graph_rag/evaluation/run_case_analysis.py
 
 from graph_rag.evaluation.models import EvalSample
 from graph_rag.evaluation.runner import evaluate_dataset
@@ -30,12 +8,9 @@ from graph_rag.infra.adapters import (
     InMemoryVectorStore,
     RecursiveChunker,
 )
-from tests.helpers import build_test_ingest_service, build_basic_query_service
+from helpers import build_ingest_service, build_query_service
 
 
-# ---------------------------------------------------------------------------
-# Data — kept in sync with test_eval_real_benchmark.py
-# ---------------------------------------------------------------------------
 
 text = """At the far eastern corner of the Eastern Continent lies a region that appears on maps only as a boundary, without any label. People call it Meteor City.
     In the eyes of most, it is a barren wasteland, uninhabited and covered with centuries of accumulated garbage.
@@ -44,7 +19,7 @@ text = """At the far eastern corner of the Eastern Continent lies a region that 
     But only those who live in Meteor City truly understand it —
     This is Meteor City, a place that accepts all things discarded, where fallen stars gather."""
 
-samples = [
+samples_chunk100 = [
     EvalSample(
         query="What is Meteor City like in the eyes of outsiders?",
         relevant_chunk_ids=["doc1#1", "doc1#2"],
@@ -59,34 +34,42 @@ samples = [
     ),
 ]
 
+samples = [
+    EvalSample(
+        query="What is Meteor City like in the eyes of outsiders?",
+        relevant_chunk_ids=["doc1#1"],
+    ),
+    EvalSample(
+        query="How do people in Meteor City primarily survive?",
+        relevant_chunk_ids=["doc1#2"],
+    ),
+    EvalSample(
+        query="What is Meteor City truly like?",
+        relevant_chunk_ids=["doc1#4"],
+    ),
+]  # _chunk200
 
-# ---------------------------------------------------------------------------
-# Setup
-# ---------------------------------------------------------------------------
 
 def _build_services():
     vector_store = InMemoryVectorStore()
     graph_store = InMemoryGraphStore()
     embedder = SentenceTransformerEmbeddingProvider()
-    chunker = RecursiveChunker(chunk_size=100, chunk_overlap=0)
+    chunker = RecursiveChunker(chunk_size=200, chunk_overlap=0)
 
-    ingest_service = build_test_ingest_service(
+    ingest_service, vector_store = build_ingest_service(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,
         chunker=chunker,
     )
-    query_service = build_basic_query_service(
+    
+    query_service = build_query_service(
         vector_store=vector_store,
         graph_store=graph_store,
         embedder=embedder,
     )
-    return ingest_service, query_service
+    return ingest_service, query_service, vector_store, graph_store, embedder, chunker
 
-
-# ---------------------------------------------------------------------------
-# Printing
-# ---------------------------------------------------------------------------
 
 def _print_mode_block(label: str, result):
     print(f"  [{label}]")
@@ -108,16 +91,33 @@ def _print_results(vector_results, graph_results, hybrid_results):
         _print_mode_block("Hybrid", hybrid_results[i])
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+def _print_query_debug(query_service, sample, mode: str):
+    answer = query_service.query(
+        query=sample.query,
+        top_k=3,
+        enable_vector=(mode in ["vector", "hybrid"]),
+        enable_graph=(mode in ["graph", "hybrid"]),
+    )
 
+    print(f"\n[DEBUG] {mode.upper()} | {sample.query}")
+    print("citations:")
+    for c in answer.citations:
+        print(c)
+
+    print("retrieval_debug:")
+    print(answer.retrieval_debug)
+    
+    
+    
 def main():
-    print("Building services and ingesting document...")
-    ingest_service, query_service = _build_services()
+    ingest_service, query_service, vector_store, graph_store, embedder, chunker = _build_services()
     ingest_service.ingest(doc_id="doc1", text=text)
-    print("Ingest complete.\n")
-
+    # vector_store._data (doc_id, chunk_id) -> (text, embedding)
+    for id, chunk in vector_store._data.items():
+        print("=" * 40)
+        print(id)
+        print(chunk[0])
+    
     K = 3
 
     vector_results, _ = evaluate_dataset(
@@ -131,10 +131,39 @@ def main():
     )
 
     print("=" * 60)
-    print("CASE-LEVEL ERROR ANALYSIS")
-    print("=" * 60)
     _print_results(vector_results, graph_results, hybrid_results)
     print()
+    
+    # 查看检索的具体结果：
+    for sample in samples:
+        _print_query_debug(query_service, sample, mode="hybrid")
+        
+    # 测 hybrid query mode 的 fusion_alpha fusion_beta
+    weight_cases = [
+        (0.2, 0.8),
+        (0.5, 0.5),
+        (0.8, 0.2),
+    ]
+    
+    for alpha, beta in weight_cases:
+        query_service = build_query_service(
+            vector_store=vector_store,
+            graph_store=graph_store,
+            embedder=embedder,
+            fusion_alpha=alpha,
+            fusion_beta=beta,
+        )
+        hybrid_results, _ = evaluate_dataset(
+            samples=samples, query_service=query_service, mode="hybrid", k=K
+        )
+        print("=" * 60)
+        for i, sample in enumerate(samples):
+            print()
+            print(f"alpha={alpha}, beta={beta}")
+            print(f"Query: {sample.query}")
+            _print_mode_block("Hybrid", hybrid_results[i])
+            
+    
 
 
 if __name__ == "__main__":

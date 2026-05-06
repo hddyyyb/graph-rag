@@ -1,6 +1,21 @@
 # Scripts
 
-This directory contains utility scripts for debugging, evaluation, and analysis.
+This directory contains utility scripts for debugging, evaluation, analysis, and engineering experiments.
+
+Scripts are typically used as a developer experimentation area rather than part of the formal system architecture.
+
+Typical characteristics:
+
+- rapid validation
+- temporary experiments
+- debugging
+- exploratory analysis
+- one-off tools
+
+These scripts do not represent core production capabilities.  
+Instead, they support the engineering research and development process.
+
+---
 
 ## compare_vector_backends.py
 

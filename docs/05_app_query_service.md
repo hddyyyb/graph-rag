@@ -76,27 +76,6 @@ Key understanding:
 - QueryService is responsible for orchestration, not low-level retrieval algorithm implementation
 
 
-### Fusion Behavior Observation
-
-Experiment setup:
-- doc1: graph-strong
-- doc2: vector-strong
-- query: transformer
-
-Observation:
-
-alpha=0.5, beta=0.5:
-- graph-dominant chunk ranks higher
-
-alpha=1.0, beta=0.1:
-- vector-dominant chunk ranks higher
-
-Conclusion:
-- fusion weights directly control ranking behavior
-- lowering beta reduces graph influence
-- increasing alpha prioritizes semantic similarity
-For detailed execution order, see the method-level flow in Section 9–13.
-
 ## 3. Constructor Dependencies
 
 `QueryService` depends only on Ports and domain-layer objects.
@@ -228,6 +207,146 @@ Fusion debug includes:
 - per-chunk source/hit/score details
 
 ---
+
+### Fusion Behavior Observation
+
+Experiment setup:
+- doc1: graph-strong
+- doc2: vector-strong
+- query: transformer
+
+Observation:
+
+alpha=0.5, beta=0.5:
+- graph-dominant chunk ranks higher
+
+alpha=1.0, beta=0.1:
+- vector-dominant chunk ranks higher
+
+Conclusion:
+- fusion weights directly control ranking behavior
+- lowering beta reduces graph influence
+- increasing alpha prioritizes semantic similarity
+For detailed execution order, see the method-level flow in Section 9–13.
+
+### Retrieval Limitation Analysis
+
+Further retrieval analysis revealed several important limitations in the current hybrid retrieval design.
+
+#### 1. Chunk Granularity Sensitivity
+
+Retrieval quality is highly sensitive to chunk boundaries.
+
+With small chunk sizes, one semantic unit may be split into multiple chunks, causing:
+
+- false negatives
+- incomplete semantic coverage
+- unstable benchmark annotations
+
+Example:
+
+```text
+doc1#3:
+people do live here...
+
+doc1#4:
+surviving by scavenging waste...
+```
+
+The answer semantics become fragmented across multiple chunks.
+
+---
+
+#### 2. Global Topic Dominance
+
+Chunks containing high-frequency topic terms tend to dominate retrieval ranking.
+
+Examples:
+- "Meteor City"
+- globally descriptive chunks
+- summary-like chunks
+
+These chunks are semantically related to many queries, but may not directly answer the query itself.
+
+As a result:
+- topical relevance may override answer relevance
+- specific answer chunks may rank lower than summary chunks
+
+---
+
+#### 3. Graph Centrality Bias
+
+Graph retrieval currently favors highly connected or high-frequency terms.
+
+High-degree nodes contribute disproportionately large graph scores.
+
+This may introduce noisy retrieval behavior during graph expansion.
+
+Examples of noisy expanded terms observed during debugging:
+
+```text
+it
+only
+all
+```
+These terms are structurally connected but semantically weak for answer relevance. These terms contribute to graph scores despite having weak answer relevance.
+
+---
+
+#### 4. Fusion Scale Imbalance
+
+Vector scores and graph scores are currently not normalized to the same scale.
+
+Observed ranges during experiments:
+
+```text
+vector_score ≈ 0.2 ~ 0.6
+graph_score ≈ 3 ~ 7
+```
+
+As a result:
+
+- graph retrieval dominates hybrid ranking
+- alpha / beta tuning has limited practical impact
+- hybrid retrieval behaves similarly to graph retrieval
+
+Current fusion:
+
+```text
+final_score = alpha * vector_score + beta * graph_score
+```
+
+still suffers from score scale imbalance.
+
+---
+
+### Future Improvement Directions
+
+Potential future directions include:
+
+- TF-IDF / BM25-style term weighting
+- score normalization before fusion
+- graph centrality penalty
+- stopword-aware graph expansion
+- reranking after retrieval
+- future multi-hop graph reasoning
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## 7. Validation and Failure Handling
 

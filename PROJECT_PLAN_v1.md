@@ -547,25 +547,206 @@ alpha=1.0, beta=0.1 → vector-dominant ranking
 - upgraded from "system user" → "system controller"
 
 ---
+## Phase 7 — Retrieval Engineering Refinement
 
-## Day39 — Retrieval Optimization (Optional)
+## Day39 — Retrieval Limitation Analysis (Completed)
+
+### Completed
+
+- analyzed fusion behavior under different alpha / beta settings
+- compared vector / graph / hybrid retrieval ranking
+- inspected retrieval_debug and scoring breakdown
+- analyzed false positives and ranking failures
+- validated chunk boundary impact on retrieval quality
+
+### Key Findings
+
+1. Chunk granularity strongly affects retrieval quality.
+Small chunk sizes can split one semantic unit into multiple chunks, causing false negatives.
+
+2. Global topic chunks dominate retrieval ranking.
+Chunks containing high-frequency topic terms such as “Meteor City” are repeatedly ranked above more specific answer chunks.
+
+3. Graph retrieval introduces centrality bias.
+High-degree or high-frequency terms tend to dominate graph expansion and scoring.
+
+4. Fusion weight tuning is currently ineffective.
+Changing alpha / beta has limited impact because vector_score and graph_score are not normalized to the same scale.
+
+### Root Causes
+
+- vector retrieval focuses on global semantic similarity
+- graph retrieval favors highly connected terms
+- current fusion directly sums raw scores
+- no frequency-aware correction exists
+
+### Future Directions
+
+- TF-IDF / BM25-style term weighting
+- score normalization before fusion
+- graph centrality penalty
+- reranking after retrieval
+- future multi-hop graph reasoning
+
+---
+
+## Day40 — Fusion Score Normalization
 
 ### Tasks
 
-- experiment with fusion weights (vector vs graph)
-- test min_score filtering
-- analyze failure cases from evaluation
-- explore improvement directions:
-  - better chunking
-  - term extraction
-  - graph expansion
+- implement minimal score normalization inside fusion logic
+- compare retrieval ranking before / after normalization
+- verify whether alpha / beta becomes more effective
+- keep backward compatibility with current fusion behavior
+- add minimal tests for normalized fusion scoring
+
+### Constraints
+
+- do not modify vector store
+- do not modify graph store
+- do not introduce new dependencies
+- keep changes localized to QueryService fusion logic
+- avoid large-scale refactoring
 
 ---
 
 ## Goal
 
-- understand retrieval limitations
-- identify real improvement directions
+- reduce graph-dominated fusion behavior
+- improve fusion controllability
+- move from raw score addition → calibrated scoring
+
+---
+
+## Day41 — Retrieval Scoring Improvement
+
+### Tasks
+
+- investigate TF-IDF / BM25-style term weighting ideas
+- analyze graph centrality effects on retrieval ranking
+- implement one minimal graph score constraint strategy:
+  - high-frequency term penalty
+  - expansion contribution cap
+  - stopword filtering
+- compare retrieval behavior before / after scoring refinement
+
+### Constraints
+
+- keep current architecture unchanged
+- avoid introducing external search libraries
+- focus on minimal engineering implementation
+- do not implement reranking yet
+
+---
+
+## Goal
+
+- reduce noisy graph expansion
+- improve ranking quality for specific-answer chunks
+- strengthen retrieval scoring engineering ability
+
+---
+
+## Day42 — Testing, Debugging & Documentation
+
+### Tasks
+
+- improve retrieval evaluation workflow
+- organize failure-case debugging process
+- improve retrieval_debug readability
+- refine analysis scripts under scripts/
+- improve retrieval-related docs:
+  - fusion behavior
+  - retrieval limitations
+  - debugging workflow
+- add more structured logging for:
+  - vector score
+  - graph score
+  - final score
+
+### Constraints
+
+- no architecture redesign
+- no infrastructure changes
+- focus on debugging and maintainability
+
+---
+
+## Goal
+
+- improve retrieval observability
+- make ranking behavior easier to analyze
+- strengthen debugging-oriented engineering skills
+
+---
+
+## Day43 — Engineering Quality Improvement
+
+### Tasks
+
+- improve Settings structure
+- organize retrieval-related configs
+- improve exception handling
+- reduce hardcoded parameters
+- improve code readability and consistency
+- clean temporary debugging logic if necessary
+- improve maintainability of retrieval pipeline code
+
+### Constraints
+
+- avoid business logic redesign
+- avoid large refactors
+- focus on maintainability and code quality
+
+---
+
+## Goal
+
+- improve engineering quality
+- strengthen production-oriented coding habits
+- improve long-term maintainability of the project
+
+---
+
+## Phase 8 — Advanced Retrieval Exploration (Optional)
+
+## Day44 — Retrieval Refactoring
+
+### Tasks
+
+- review QueryService complexity
+- improve helper method boundaries
+- simplify retrieval-related flow if needed
+- improve internal naming consistency
+- reduce coupling between retrieval stages
+
+---
+
+## Goal
+
+- improve code structure readability
+- strengthen safe refactoring ability
+- practice incremental engineering optimization
+
+---
+
+## Day45 — Future Retrieval Directions
+
+### Tasks
+
+- explore reranking directions
+- explore future multi-hop graph retrieval
+- analyze retrieval scalability limitations
+- investigate hybrid retrieval tradeoffs
+- summarize long-term retrieval roadmap
+
+---
+
+## Goal
+
+- transition from feature implementation
+  → retrieval system design thinking
+- strengthen long-term retrieval engineering understanding
 
 ---
 
