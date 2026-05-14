@@ -78,6 +78,7 @@ class QueryService:
         graph_top_k: int = 5,
         fusion_alpha: float = 1.0,
         fusion_beta: float = 1.0,
+        enable_fusion_score_normalization: bool = False,
     ) -> None:
         self.vector_store = vector_store
         self.graph_store = graph_store
@@ -89,6 +90,9 @@ class QueryService:
         self.graph_top_k = graph_top_k
         self.fusion_alpha = fusion_alpha
         self.fusion_beta = fusion_beta
+        self.enable_fusion_score_normalization = (
+            enable_fusion_score_normalization
+        )
 
 
 
@@ -103,6 +107,23 @@ class QueryService:
             return 0.0
         return float(chunk.score)
 
+    
+    def _normalize_scores(self, scores: list[float]) -> list[float]:
+        # 把score list 变成标准 score list
+        if not scores:
+            return []
+
+        min_score = min(scores)
+        max_score = max(scores)
+
+        if max_score == min_score:
+            return [1.0 if score > 0 else 0.0 for score in scores]
+
+        return [
+            (score - min_score) / (max_score - min_score)
+            for score in scores
+        ]
+        
 
     def _fuse_chunks(
         self,
@@ -152,6 +173,36 @@ class QueryService:
                 merged[key]["graph_hit"] = True
                 merged[key]["graph_score"] = self._safe_score(chunk)
 
+        normalization_enabled = getattr(
+            self,
+            "enable_fusion_score_normalization",
+            False,
+        )
+        # 尝试获取 self.enable_fusion_score_normalization, 如果该属性不存在，返回 False
+
+        if normalization_enabled:
+            items = list(merged.values())
+
+            vector_scores = [item["vector_score"] for item in items]
+            graph_scores = [item["graph_score"] for item in items]
+
+            normalized_vector_scores = self._normalize_scores(vector_scores)
+            normalized_graph_scores = self._normalize_scores(graph_scores)
+
+            for item, v_norm, g_norm in zip(
+                items,
+                normalized_vector_scores,
+                normalized_graph_scores,
+            ):
+                item["raw_vector_score"] = item["vector_score"]
+                item["raw_graph_score"] = item["graph_score"]
+                item["vector_score"] = v_norm  # 修改的是 merged[key]["vector_score"]
+                item["graph_score"] = g_norm
+                # items里面的item是merged内部dict对象的引用
+                
+                
+                
+        
         fused_chunks: list[RetrievedChunk] = []
         fusion_debug_chunks: list[dict] = []
 
@@ -177,18 +228,21 @@ class QueryService:
             )
             fused_chunks.append(fused_chunk)
 
-            fusion_debug_chunks.append(
-                {
-                    "doc_id": item["doc_id"],
-                    "chunk_id": item["chunk_id"],
-                    "source": source,
-                    "vector_hit": vector_hit,
-                    "graph_hit": graph_hit,
-                    "vector_score": item["vector_score"],
-                    "graph_score": item["graph_score"],
-                    "final_score": final_score,
-                }
-            )
+            debug_item = {
+                "doc_id": item["doc_id"],
+                "chunk_id": item["chunk_id"],
+                "source": source,
+                "vector_hit": vector_hit,
+                "graph_hit": graph_hit,
+                "vector_score": item["vector_score"],
+                "graph_score": item["graph_score"],
+                "final_score": final_score,
+            }
+            if normalization_enabled:
+                debug_item["raw_vector_score"] = item["raw_vector_score"]
+                debug_item["raw_graph_score"] = item["raw_graph_score"]
+            
+            fusion_debug_chunks.append(debug_item)
 
         fused_chunks.sort(key=lambda c: (-c.score, c.chunk_id, c.doc_id))
         fusion_debug_chunks.sort(
@@ -198,6 +252,8 @@ class QueryService:
         fusion_debug = {
             "alpha": alpha,
             "beta": beta,
+            "normalization_enabled": normalization_enabled,
+            "normalization_method": "minmax" if normalization_enabled else "none",
             "input": {
                 "vector_count": len(vector_chunks),
                 "graph_count": len(graph_chunks),

@@ -62,6 +62,7 @@ def build_query_service(
         graph_top_k=graph_top_k,
         fusion_alpha= fusion_alpha,
         fusion_beta =fusion_beta,
+        enable_fusion_score_normalization=True,
     )
 
 def build_ingest_service(

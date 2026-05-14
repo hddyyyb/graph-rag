@@ -590,31 +590,32 @@ Changing alpha / beta has limited impact because vector_score and graph_score ar
 
 ---
 
-## Day40 — Fusion Score Normalization
+## Day40 — Fusion Score Normalization ✅ Completed
 
-### Tasks
+### Completed
 
-- implement minimal score normalization inside fusion logic
-- compare retrieval ranking before / after normalization
-- verify whether alpha / beta becomes more effective
-- keep backward compatibility with current fusion behavior
-- add minimal tests for normalized fusion scoring
+- implemented optional min-max normalization inside fusion logic
+- normalized vector_score and graph_score before fusion
+- added normalization debug fields:
+  - normalization_enabled
+  - normalization_method
+  - raw_vector_score
+  - raw_graph_score
+- preserved backward compatibility
+- added minimal fusion normalization tests
 
-### Constraints
+### Validation
 
-- do not modify vector store
-- do not modify graph store
-- do not introduce new dependencies
-- keep changes localized to QueryService fusion logic
-- avoid large-scale refactoring
+- verified normalized score range: [0, 1]
+- verified alpha / beta can affect ranking under controlled samples
+- reduced raw score scale imbalance between vector and graph retrieval
 
----
+### Constraints Kept
 
-## Goal
-
-- reduce graph-dominated fusion behavior
-- improve fusion controllability
-- move from raw score addition → calibrated scoring
+- no vector store modification
+- no graph store modification
+- no new dependencies
+- changes localized to QueryService fusion logic
 
 ---
 
