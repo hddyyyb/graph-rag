@@ -122,11 +122,13 @@ class InMemoryGraphStore(GraphStorePort):
             direct_hit_weight: float = 1.0,
             expanded_hit_weight: float = 0.5,
             max_expanded_terms: int = 10,
-            ) -> None:
+            expansion_score_cap: float | None = 2.0,
+            ) -> None:  # 默认expansion_score_cap为2，但是也可以显式传入None
         self.expand_per_term_limit = expand_per_term_limit
         self.direct_hit_weight = direct_hit_weight
         self.expanded_hit_weight = expanded_hit_weight
         self.max_expanded_terms = max_expanded_terms
+        self.expansion_score_cap = expansion_score_cap
         
         # chunk_id -> RetrievedChunk
         self.chunk_store: Dict[str, RetrievedChunk] = {}
@@ -210,6 +212,17 @@ class InMemoryGraphStore(GraphStorePort):
         return results
 
 
+    def _scoring_formula(self) -> str:
+        if self.expansion_score_cap is not None:
+            return (
+                f"score = direct_hit_count * direct_hit_weight + "
+                f"min(sum(expanded_edge_weight * expanded_hit_weight), {self.expansion_score_cap})"
+            )
+        return (
+            "score = direct_hit_count * direct_hit_weight + "
+            "sum(expanded_edge_weight * expanded_hit_weight)"
+        )
+
     def _empty_debug_payload(self, query: str) -> Dict[str, Any]:
         return {
             "query": query,
@@ -219,14 +232,12 @@ class InMemoryGraphStore(GraphStorePort):
             "weights": {
                 "direct_hit_weight": self.direct_hit_weight,
                 "expanded_hit_weight": self.expanded_hit_weight,
+                "expansion_score_cap": self.expansion_score_cap,
             },
-            "scoring_formula": (
-                "score = direct_hit_count * direct_hit_weight + "
-                 "sum(expanded_edge_weight * expanded_hit_weight)",
-            ),
+            "scoring_formula": self._scoring_formula(),
             "meta": {
                 "expansion_depth": 1,
-                "expand_per_term_limit": self.expand_per_term_limit, 
+                "expand_per_term_limit": self.expand_per_term_limit,
                 "max_expanded_terms": self.max_expanded_terms,
             },
         }
@@ -295,7 +306,13 @@ class InMemoryGraphStore(GraphStorePort):
 
             direct_score = len(direct_hit_terms) * self.direct_hit_weight
             expanded_score = sum(item["contribution"] for item in expanded_hit_items)
-                                                                                    
+
+            if self.expansion_score_cap is not None:
+                capped_expanded_score = min(expanded_score, self.expansion_score_cap)
+                expansion_capped = expanded_score > self.expansion_score_cap
+            else:
+                capped_expanded_score = expanded_score
+                expansion_capped = False
 
             chunks_debug.append(
                 {
@@ -307,6 +324,9 @@ class InMemoryGraphStore(GraphStorePort):
                     "expanded_hit_count": len(expanded_hit_items),
                     "direct_score": direct_score,
                     "expanded_score": expanded_score,
+                    "capped_expanded_score": capped_expanded_score,
+                    "expansion_score_cap": self.expansion_score_cap,
+                    "expansion_capped": expansion_capped,
                     "score": chunk.score,
                 }
             )
@@ -319,11 +339,9 @@ class InMemoryGraphStore(GraphStorePort):
             "weights": {
                 "direct_hit_weight": self.direct_hit_weight,
                 "expanded_hit_weight": self.expanded_hit_weight,
+                "expansion_score_cap": self.expansion_score_cap,
             },
-            "scoring_formula": (
-                "score = direct_hit_count * direct_hit_weight + "
-                "sum(expanded_edge_weight * expanded_hit_weight)"
-            ),
+            "scoring_formula": self._scoring_formula(),
             "meta": {
                 "expansion_depth": 1,
                 "expand_per_term_limit": self.expand_per_term_limit,
@@ -494,8 +512,13 @@ class InMemoryGraphStore(GraphStorePort):
             direct_count = len(direct_hits.get(chunk_id, set()))  # chunk命中了多少个direct term
             expanded_score = sum(
                 item["contribution"] for item in expanded_hits.get(chunk_id, []))  # 命中term contribution的和；expanded_hits：chunk_id: [{"query_term": "...", "expanded_term": "...", "weight": 4.0, "contribution": 2.0}]，对每个命中的expanded term，根据它的权重计算出对最终score的贡献，然后求和得到这个chunk的expanded_score
-                       
-            score = self.direct_hit_weight * direct_count + expanded_score  # 用chunk命中term的数量来打分，直接命中和扩展命中的权重不同
+
+            capped_expanded_score = (
+                min(expanded_score, self.expansion_score_cap)
+                if self.expansion_score_cap is not None
+                else expanded_score
+            )
+            score = self.direct_hit_weight * direct_count + capped_expanded_score  # 用chunk命中term的数量来打分，直接命中和扩展命中的权重不同
             # 到目前为止，后续的处理和基于命中数量无关，因此改为基于权重的方法时候，后面的代码不需要改或者改动很小
             chunk = self.chunk_store[chunk_id]
             scored_chunks.append(

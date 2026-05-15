@@ -619,32 +619,38 @@ Changing alpha / beta has limited impact because vector_score and graph_score ar
 
 ---
 
-## Day41 — Retrieval Scoring Improvement
+## Day41 — Retrieval Scoring Improvement ✅ Completed
 
-### Tasks
+### Completed
 
-- investigate TF-IDF / BM25-style term weighting ideas
-- analyze graph centrality effects on retrieval ranking
-- implement one minimal graph score constraint strategy:
-  - high-frequency term penalty
+- analyzed graph centrality bias and noisy expansion behavior
+- inspected retrieval_debug scoring breakdown
+- implemented minimal graph score constraint:
   - expansion contribution cap
-  - stopword filtering
-- compare retrieval behavior before / after scoring refinement
+- updated graph scoring:
 
-### Constraints
+```text
+score = direct_score + min(expanded_score, expansion_score_cap)
+```
 
-- keep current architecture unchanged
-- avoid introducing external search libraries
-- focus on minimal engineering implementation
-- do not implement reranking yet
+- added scoring debug fields:
+  - capped_expanded_score
+  - expansion_score_cap
+  - expansion_capped
 
----
+### Validation
 
-## Goal
+- verified before / after retrieval behavior
+- reduced noisy graph expansion domination
+- validated InMemory / Neo4j consistency
+- added regression tests
 
-- reduce noisy graph expansion
-- improve ranking quality for specific-answer chunks
-- strengthen retrieval scoring engineering ability
+### Constraints Kept
+- no architecture redesign
+- no retrieval pipeline refactor
+- no reranker
+- no multi-hop graph
+- no external search library
 
 ---
 
