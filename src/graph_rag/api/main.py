@@ -190,6 +190,7 @@ def build_container(settings: Settings) -> Dict[str, Any]:
         graph_top_k=settings.graph_top_k,
         fusion_alpha=settings.fusion_alpha,
         fusion_beta=settings.fusion_beta,
+        enable_fusion_score_normalization = settings.enable_fusion_score_normalization
     )
 
     # 第三步：把同一个 settings 也挂进 container 里，让service/路由都能访问到配置（比如chunk_size、top_k、后端选择等），这样就实现了全局配置中心的效果。

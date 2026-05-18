@@ -38,5 +38,5 @@ def test_query_merged_debug_hits_are_limited_to_10():
         query= "Hello",
     )
        
-    assert response.retrieval_debug["merged"]["count"] == 12
-    assert len(response.retrieval_debug["merged"]["hits"]) == 10
+    assert response.retrieval_debug["final"]["count"] == 12
+    assert len(response.retrieval_debug["final"]["hits"]) == 10

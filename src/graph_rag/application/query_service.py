@@ -200,9 +200,6 @@ class QueryService:
                 item["graph_score"] = g_norm
                 # items里面的item是merged内部dict对象的引用
                 
-                
-                
-        
         fused_chunks: list[RetrievedChunk] = []
         fusion_debug_chunks: list[dict] = []
 
@@ -378,19 +375,113 @@ class QueryService:
 
         return vector_chunks, graph_chunks, graph_debug, timings
 
+    def _build_ranking_preview(
+        self,
+        *,
+        final_chunks: List[RetrievedChunk],
+        fusion_debug: Dict[str, Any],
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Build a human-readable preview of final ranking results.
+
+        Notes:
+        - final_chunks decides what appears in the preview.
+        - fusion_debug["chunks"] provides score breakdown.
+        - vector_score / graph_score in fusion_debug are effective scores
+        used by fusion. When normalization is enabled, raw_* fields keep
+        the pre-normalization scores.
+        """
+        fusion_debug_by_key = {
+            (item.get("doc_id"), item.get("chunk_id")): item
+            for item in fusion_debug.get("chunks", [])
+        }
+
+        preview = []
+
+        for rank, chunk in enumerate(final_chunks[:limit], start=1):
+            fusion_item = fusion_debug_by_key.get((chunk.doc_id, chunk.chunk_id), {})
+
+            vector_hit = bool(fusion_item.get("vector_hit", False))
+            graph_hit = bool(fusion_item.get("graph_hit", False))
+
+            effective_vector_score = fusion_item.get("vector_score", 0.0)
+            effective_graph_score = fusion_item.get("graph_score", 0.0)
+            final_score = fusion_item.get("final_score", chunk.score)
+
+            raw_vector_score = fusion_item.get("raw_vector_score")
+            raw_graph_score = fusion_item.get("raw_graph_score")
+
+            matched_by = []
+            if vector_hit:
+                matched_by.append("vector")
+            if graph_hit:
+                matched_by.append("graph")
+
+            if not matched_by and chunk.source:
+                matched_by.append(chunk.source)
+
+            preview.append(
+                {
+                    "rank": rank,
+                    "doc_id": chunk.doc_id,
+                    "chunk_id": chunk.chunk_id,
+                    "source": chunk.source,
+                    "matched_by": matched_by,
+                    "vector_hit": vector_hit,
+                    "graph_hit": graph_hit,
+                    "raw_vector_score": raw_vector_score,
+                    "raw_graph_score": raw_graph_score,
+                    "effective_vector_score": effective_vector_score,
+                    "effective_graph_score": effective_graph_score,
+                    "final_score": final_score,
+                }
+            )
+
+        return preview
+
+    def _build_scoring_overview(
+        self,
+        *,
+        fusion_debug: Dict[str, Any],
+        graph_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        graph_weights = graph_payload.get("weights", {})
+        graph_chunks = graph_payload.get("chunks", [])
+
+        return {
+            "fusion": {
+                "alpha": fusion_debug.get("alpha"),
+                "beta": fusion_debug.get("beta"),
+                "normalization_enabled": fusion_debug.get("normalization_enabled", False),
+                "normalization_method": fusion_debug.get("normalization_method"),
+            },
+            "graph": {
+                "direct_hit_weight": graph_weights.get("direct_hit_weight"),
+                "expanded_hit_weight": graph_weights.get("expanded_hit_weight"),
+                "expansion_score_cap": graph_weights.get("expansion_score_cap"),
+                "has_expansion_capped_result": any(
+                    c.get("expansion_capped", False)
+                    for c in graph_chunks
+                ),
+            },
+        }
 
     def _build_retrieval_debug(
         self,
         *,
         vector_k: int,
         graph_k: int,
-        vector_chunks: List[RetrievedChunk],
-        graph_chunks: List[RetrievedChunk],
+        vector_chunks: List[RetrievedChunk],    # vector原始结果
+        graph_chunks: List[RetrievedChunk],     # graph原始结果
         graph_debug: Optional[Dict[str, Any]],
-        fusion_debug: Dict[str, Any],
-        merged: List[RetrievedChunk],
+        fusion_debug: Dict[str, Any],         
+        fused_chunks: List[RetrievedChunk],     # fusion之后结果
+        final_chunks: List[RetrievedChunk],     # postprocess之后结果
         timings: Dict[str, float],
         stats: Dict[str, int],
+        enable_graph: bool,
+        enable_vector: bool,
     ) -> Dict[str, Any]:
         
         graph_payload: Dict[str, Any] = {
@@ -404,8 +495,29 @@ class QueryService:
         if graph_debug is not None:
             graph_payload.update(graph_debug)
 
-
+        
+        
         retrieval_debug: Dict[str, Any] = {
+            "summary": {
+                "mode": (
+                    "hybrid"
+                    if enable_vector and enable_graph
+                    else "vector"
+                    if enable_vector
+                    else "graph"
+                    if enable_graph
+                    else "none"
+                ),
+                "vector_enabled": enable_vector,
+                "graph_enabled": enable_graph,
+                "vector_count": len(vector_chunks),
+                "graph_count": len(graph_chunks),
+                "fused_count": len(fused_chunks),
+                "final_count": len(final_chunks),
+                "postprocess_removed_count": max(0, len(fused_chunks) - len(final_chunks)),
+                "normalization_enabled": fusion_debug.get("normalization_enabled", False),
+                "normalization_method": fusion_debug.get("normalization_method"),
+            },
             "vector": {
                 "top_k": vector_k,
                 "hits": [
@@ -419,8 +531,8 @@ class QueryService:
             },
             "graph": graph_payload,
             "fusion": fusion_debug,
-            "merged": {
-                "count": len(merged),
+            "fused": {
+                "count": len(fused_chunks),
                 "hits": [
                     {
                         "doc_id": c.doc_id,
@@ -428,9 +540,26 @@ class QueryService:
                         "score": c.score,
                         "source": c.source,
                     }
-                    for c in merged[:10]
+                    for c in fused_chunks[:10]
                 ],
             },
+            "final": {
+                "count": len(final_chunks),
+                "hits": [
+                    {
+                        "doc_id": c.doc_id,
+                        "chunk_id": c.chunk_id,
+                        "score": c.score,
+                        "source": c.source,
+                    }
+                    for c in final_chunks[:10]
+                ],
+            },
+            "ranking_preview": self._build_ranking_preview(final_chunks=final_chunks, fusion_debug=fusion_debug),
+            "scoring_overview": self._build_scoring_overview(
+                fusion_debug=fusion_debug,
+                graph_payload=graph_payload,
+            ),
             "timings": timings,
             "stats": stats,
         }
@@ -473,14 +602,14 @@ class QueryService:
         self,
         *,
         query: str,
-        merged: List[RetrievedChunk],
+        final: List[RetrievedChunk],
         timings: Dict[str, float],
     ):
         start = time.perf_counter()
         try:
             answer_text = self.kernel.generate_answer(
                 query = query, 
-                contexts =  merged
+                contexts =  final
                 )    # 调用Kernel生成answer
         except Exception as e:
             self._handle_query_failure(
@@ -508,9 +637,12 @@ class QueryService:
         graph_chunks,
         graph_debug,
         fusion_debug,
-        merged,
+        fused_chunks,  # _fuse_chunks()输出，postprocess之前
+        final_chunks,  # processed.chunks，postprocess之后
         timings,
         stats,
+        enable_graph,
+        enable_vector,
     ):
         """
         参数说明:
@@ -519,20 +651,20 @@ class QueryService:
         - vector_k / graph_k: 实际用于检索的top_k参数值
         - vector_chunks / graph_chunks: 原始的向量检索和图检索结果
         - graph_debug: 图检索的调试信息(如果有的话)
-        - merged: 最终用于生成答案的chunks列表(经过合并和排序)
+        - final: 最终用于生成答案的chunks列表(经过合并和排序)
         - timings: 各个阶段的耗时统计
         - stats: 各种计数统计(如检索到的chunk数量、引用数量等)
 
         _build_retrieval_debug的作用及与processed的区别:
         - _build_retrieval_debug负责构建retrieval_debug字典, 包含完整检索调试信息:
-        包括原始vector/graph检索结果、最终merged chunks、以及timings和stats
+        包括原始vector/graph检索结果、最终final chunks、以及timings和stats
         主要用于帮助开发者理解查询流程, 尤其是retrieval阶段的行为
         - processed是post_processor的直接输出, 是结构化结果:
         包含最终用于生成答案的chunks和citations
         - 区别: processed关注"结果", _build_retrieval_debug覆盖"全过程"(retrieval -> postprocess -> stats)
 
         二者关系:
-        - processed中的chunks对应retrieval_debug中的merged结果
+        - processed中的chunks对应retrieval_debug中的final结果
         - processed中的citations对应stats["citation_count"]的一部分
         - retrieval_debug额外包含:
         原始检索结果(vector_chunks / graph_chunks)、graph_debug、timings、stats等全过程信息
@@ -554,9 +686,12 @@ class QueryService:
             graph_chunks = graph_chunks,
             graph_debug = graph_debug,
             fusion_debug=fusion_debug,
-            merged = merged,
+            fused_chunks=fused_chunks,
+            final_chunks=final_chunks,
             timings = timings,
             stats = stats,
+            enable_graph = enable_graph,
+            enable_vector = enable_vector,
         )
         
 
@@ -564,7 +699,7 @@ class QueryService:
         self.trace.event(
             "query_done",
             trace_id=trace_id,
-            merged=len(merged),
+            final=len(final_chunks),
         )
 
         return Answer(
@@ -574,6 +709,44 @@ class QueryService:
             citations=processed.citations,
         )
 
+
+    # emit: 向外发出一个事件、日志、信号或通知。
+    def _emit_retrieval_query_done(
+        self,
+        *,
+        query: str,
+        answer: Answer,
+    ) -> None:
+        debug = answer.retrieval_debug or {}
+        
+        summary = debug.get("summary", {})
+        scoring = debug.get("scoring_overview", {})
+        fusion = scoring.get("fusion", {})
+        graph = scoring.get("graph", {})
+        ranking_preview = debug.get("ranking_preview", [])
+        
+        top1 = ranking_preview[0] if ranking_preview else {}
+        
+        self.trace.event(
+            "retrieval_query_done",
+            query=query,
+            mode=summary.get("mode"),
+            vector_count=summary.get("vector_count"),
+            graph_count=summary.get("graph_count"),
+            fused_count=summary.get("fused_count"),
+            final_count=summary.get("final_count"),
+            postprocess_removed_count=summary.get("postprocess_removed_count"),
+            normalization_enabled=summary.get("normalization_enabled"),
+            normalization_method=summary.get("normalization_method"),
+            alpha=fusion.get("alpha"),
+            beta=fusion.get("beta"),
+            expansion_score_cap=graph.get("expansion_score_cap"),
+            has_expansion_capped_result=graph.get("has_expansion_capped_result"),
+            top1_doc_id=top1.get("doc_id"),
+            top1_chunk_id=top1.get("chunk_id"),
+            top1_source=top1.get("source"),
+            top1_final_score=top1.get("final_score"),
+        )
 
 
     def query(
@@ -679,29 +852,38 @@ class QueryService:
             stats=stats,
         )
 
-        merged = processed.chunks
-
         # llm_generation_time
         answer_text = self._generate_answer_text(
             query = q,
-            merged = merged,
+            final = processed.chunks,
             timings = timings,
             )
 
         # build debug info + finalize response
-        return self._build_answer(
+        answer = self._build_answer(
             answer_text = answer_text,
             processed = processed,
             vector_k = vector_k,
             graph_k = graph_k,
             graph_debug = graph_debug,
-            fusion_debug = fusion_debug,
             vector_chunks = vector_chunks,
             graph_chunks = graph_chunks,
-            merged = merged,
+            fusion_debug = fusion_debug,
+            fused_chunks=fused_chunks,
+            final_chunks=processed.chunks,
             timings = timings,
             stats = stats,
+            enable_graph = opts.enable_graph,
+            enable_vector = opts.enable_vector,
         )
+        
+        self._emit_retrieval_query_done(
+            query=query,
+            answer=answer,
+        )
+
+                
+        return answer
 
 
         

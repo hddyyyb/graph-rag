@@ -108,4 +108,4 @@ def test_query_service_uses_post_processed_chunks_and_citations():
     kernel_keys =[(chunk.doc_id, chunk.chunk_id) for chunk in kernel.last_chunks]  # [RetrievedChunk]
     assert kernel_keys ==  [("doc_1", "chunk_1"), ("doc_2", "chunk_2")]  
 
-    assert result.retrieval_debug["merged"]["count"] == 2
+    assert result.retrieval_debug["final"]["count"] == 2

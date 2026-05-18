@@ -10,6 +10,7 @@ Neo4j 需要环境变量：NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD
 import argparse
 import os
 import sys
+import json
 
 # 把 scripts/ 目录加进 path，以便复用 helpers.py
 sys.path.insert(0, os.path.dirname(__file__))
@@ -130,25 +131,29 @@ def _run_queries(graph_store, label: str) -> None:
         print(f"QUERY: {query}")
         print(SEP2)
 
-        query_service.query(
+        answer = query_service.query(
             query=query,
             top_k=5,
             enable_vector=False,
             enable_graph=True,
         )
 
-        debug = getattr(graph_store, "_last_debug", None)
-        if debug is None:
-            # 尝试 get_last_debug() 方法
-            get_debug = getattr(graph_store, "get_last_debug", None)
-            if callable(get_debug):
-                debug = get_debug()
+        debug = answer.retrieval_debug
 
-        if debug is None:
-            print("  [WARN] _last_debug is None — graph_store did not populate debug info")
-            continue
+        print("=== Retrieval Debug Summary ===")
+        print(json.dumps(debug.get("summary", {}), ensure_ascii=False, indent=2))
+        
+        print("=== Ranking Preview ===")
+        print(json.dumps(debug.get("ranking_preview", []), ensure_ascii=False, indent=2)) 
+        
+        print("=== Scoring Overview ===")
+        print(json.dumps(debug.get("scoring_overview", {}), ensure_ascii=False, indent=2))
 
-        _print_debug(debug)
+        print("=== Final Results ===")
+        print(json.dumps(debug.get("final", {}), ensure_ascii=False, indent=2))  
+        
+        print("=== Graph Debug ===")
+        _print_debug(debug.get("graph", {}))
 
 
 # ---------------------------------------------------------------------------

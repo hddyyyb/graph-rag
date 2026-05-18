@@ -104,9 +104,13 @@ Used to sort, filter, deduplicate, and finalize candidate chunks.
 - `graph_top_k: int = 5`
 - `fusion_alpha: float = 1.0`
 - `fusion_beta: float = 1.0`
+- `enable_fusion_score_normalization: bool = True`
 
 These fields define default retrieval and fusion behavior.
 
+`enable_fusion_score_normalization` controls whether vector_score and graph_score are normalized before fusion.
+
+When enabled, raw scores are preserved for debugging, while effective scores are used for fusion calculation.
 ---
 
 ## 4. Stored Fields
@@ -123,6 +127,7 @@ The class stores:
 - graph retrieval default top_k
 - fusion alpha
 - fusion beta
+- fusion score normalization flag
 
 ---
 
@@ -187,6 +192,14 @@ For each chunk identity `(doc_id, chunk_id)`:
 Final score:
 
 ```final_score = alpha * vector_score + beta * graph_score```
+
+When fusion score normalization is enabled:
+
+- raw_vector_score and raw_graph_score keep original retrieval scores
+- vector_score and graph_score become effective scores used by fusion
+- min-max normalization is applied before final fusion scoring
+
+This makes vector and graph scores more comparable and prevents one retrieval source from dominating only because of score scale differences.
 
 Source labels:
 
@@ -454,10 +467,14 @@ Construct final `retrieval_debug` payload.
 #### Top-Level Structure:
 ```json
 {
+  "summary": { "...": "..." },
   "vector": { "...": "..." },
   "graph": { "...": "..." },
   "fusion": { "...": "..." },
-  "merged": { "...": "..." },
+  "fused": { "...": "..." },
+  "final": { "...": "..." },
+  "ranking_preview": [ "... " ],
+  "scoring_overview": { "...": "..." },
   "timings": { "...": "..." },
   "stats": { "...": "..." }
 }
@@ -476,9 +493,23 @@ Contains graph retrieval hit summary and, if available, graph-specific debug pay
 
 Contains hybrid merge details.
 
-```merged```
+`fused`
 
-Contains final merged chunk preview.
+Contains fusion output before post-processing.
+
+`final`
+
+Contains post-processed final chunk preview.
+
+`ranking_preview`
+
+Contains a compact human-readable view of final ranking results.
+
+It is based on final chunks and enriched with fusion score details.
+
+`scoring_overview`
+
+Contains fusion and graph scoring configuration.
 
 ```timings```
 
@@ -495,9 +526,50 @@ Contains counts such as:
 
 ---
 
-## 11. Postprocess Stage
+## 11. Runtime Observability
 
-### 11.1 ```_postprocess_chunks(...)```
+QueryService emits structured trace events through TracePort.
+
+Important query-level events include:
+
+- `query_start`
+- `vector_retrieved`
+- `graph_retrieved`
+- `retrieval_timing`
+- `query_done`
+- `retrieval_query_done`
+
+### retrieval_query_done
+
+This event provides a compact runtime summary of retrieval behavior.
+
+It includes:
+
+- mode
+- vector_count
+- graph_count
+- fused_count
+- final_count
+- postprocess_removed_count
+- normalization_enabled
+- normalization_method
+- alpha
+- beta
+- expansion_score_cap
+- has_expansion_capped_result
+- top1_doc_id
+- top1_chunk_id
+- top1_source
+- top1_final_score
+
+This event is intended for runtime observability.
+Detailed analysis should still use retrieval_debug and debugging scripts.
+
+---
+
+## 12. Postprocess Stage
+
+### 12.1 ```_postprocess_chunks(...)```
 
 #### Purpose:
 Apply final filtering and ranking.
@@ -533,9 +605,9 @@ Also updates:
 
 ---
 
-## 12. Generation Stage
+## 13. Generation Stage
 
-### 12.1 _generate_answer_text(...)
+### 13.1 _generate_answer_text(...)
 
 #### Purpose:
 Generate final answer text.
@@ -555,9 +627,9 @@ Also updates:
 - `llm_generation_time`
 ---
 
-## 13. Final Answer Assembly
+## 14. Final Answer Assembly
 
-### 13.1 ```_build_answer(...)```
+### 14.1 ```_build_answer(...)```
 
 #### Purpose:
 Construct final `Answer` object.
@@ -571,9 +643,9 @@ Includes:
 
 ---
 
-## 14. Public Entry Point
+## 15. Public Entry Point
 
-### 14.1 query(...)
+### 15.1 query(...)
 
 ```python
 query(
@@ -608,7 +680,7 @@ Expected semantic content includes:
 
 ---
 
-## 15. Design Strengths
+## 16. Design Strengths
 
 #### Backend-agnostic orchestration
 
@@ -629,7 +701,7 @@ Most methods are deterministic and Port-based, which makes service-level tests e
 
 ---
 
-## 16. Scope Boundary
+## 17. Scope Boundary
 
 Not included:
 

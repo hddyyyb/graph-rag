@@ -62,7 +62,7 @@ def test_vector_store_backend_switch2(tmp_path):
     r4 = client_reboot.post('/query',json = payload2)
 
     dbg = r4.json()["retrieval_debug"]
-    assert dbg["merged"]["count"] > 0
+    assert dbg["final"]["count"] > 0
     #print(r4.json()["retrieval_debug"])
 
 
@@ -81,6 +81,6 @@ def test_memory_backend_not_persistent(tmp_path):
     r = client2.post("/query", json={"query": "check sth", "top_k": 2, "enable_graph": True, "enable_vector": True})
 
     dbg = r.json()["retrieval_debug"]
-    assert dbg["merged"]["count"] == 0
+    assert dbg["final"]["count"] == 0
     # 或者 assert len(dbg["vector"]["hits"]) == 0
     

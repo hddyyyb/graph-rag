@@ -654,28 +654,65 @@ score = direct_score + min(expanded_score, expansion_score_cap)
 
 ---
 
-## Day42 — Testing, Debugging & Documentation
+## Day42 — Retrieval Debugging & Observability ✅ Completed
 
-### Tasks
+### Completed
 
-- improve retrieval evaluation workflow
-- organize failure-case debugging process
-- improve retrieval_debug readability
-- refine analysis scripts under scripts/
-- improve retrieval-related docs:
-  - fusion behavior
-  - retrieval limitations
-  - debugging workflow
-- add more structured logging for:
-  - vector score
-  - graph score
-  - final score
+- organized retrieval debugging workflow
+- improved retrieval_debug readability with structured sections:
+  - summary
+  - ranking_preview
+  - scoring_overview
+  - fused
+  - final
+- clarified retrieval result stages:
+  - vector_chunks / graph_chunks: raw retrieval results
+  - fused_chunks: fusion output before post-processing
+  - final_chunks: post-processed final results
+- replaced ambiguous `merged` debug naming with `final`
+- added ranking_preview based on final_chunks
+- enriched ranking_preview with:
+  - vector_hit / graph_hit
+  - raw_vector_score / raw_graph_score
+  - effective_vector_score / effective_graph_score
+  - final_score
+- added scoring_overview for:
+  - alpha / beta
+  - normalization status
+  - graph scoring weights
+  - expansion_score_cap
+  - expansion capped status
+- added retrieval_query_done structured trace event
+- connected enable_fusion_score_normalization from Settings to QueryService through API container initialization
+- updated scripts README and retrieval debugging workflow documentation
+- verified real logging output includes normalization status
+- passed pytest -q
 
-### Constraints
+### Key Outcome
 
-- no architecture redesign
-- no infrastructure changes
-- focus on debugging and maintainability
+The retrieval pipeline now has a clearer observability layer.
+
+Developers can inspect retrieval behavior from three levels:
+
+1. runtime logs for quick diagnosis
+2. retrieval_debug for structured result analysis
+3. debugging scripts for deep graph / fusion inspection
+
+### Validation
+
+- pytest -q passed
+- inspect_graph_scoring_case.py verified debug output
+- real logging verified:
+  - query_done uses final
+  - retrieval_query_done includes normalization_enabled=True
+  - retrieval_query_done includes mode, counts, top1 result, and scoring configuration
+
+### Constraints Kept
+
+- no retrieval pipeline redesign
+- no reranker
+- no new infrastructure
+- no architecture change
 
 ---
 
@@ -691,18 +728,26 @@ score = direct_score + min(expanded_score, expansion_score_cap)
 
 ### Tasks
 
-- improve Settings structure
-- organize retrieval-related configs
+- review Settings structure and retrieval config naming
+- organize retrieval-related configs:
+  - vector_top_k
+  - graph_top_k
+  - fusion_alpha
+  - fusion_beta
+  - enable_fusion_score_normalization
+- consider adding `.env.example`
 - improve exception handling
 - reduce hardcoded parameters
 - improve code readability and consistency
 - clean temporary debugging logic if necessary
+- review logging field naming consistency
 - improve maintainability of retrieval pipeline code
 
 ### Constraints
 
 - avoid business logic redesign
 - avoid large refactors
+- do not change retrieval scoring logic
 - focus on maintainability and code quality
 
 ---
@@ -712,7 +757,6 @@ score = direct_score + min(expanded_score, expansion_score_cap)
 - improve engineering quality
 - strengthen production-oriented coding habits
 - improve long-term maintainability of the project
-
 ---
 
 ## Phase 8 — Advanced Retrieval Exploration (Optional)

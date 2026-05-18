@@ -19,6 +19,9 @@ class Settings(BaseSettings):    # 定义整个GraphRAG系统的配置对象
     vector_top_k: int = Field(default=5, ge=1)  # ge = greater than or equal， 必须是 整数，且 ≥ 1
     graph_top_k: int = Field(default=5, ge=1)
 
+    # retrieval fusion
+    enable_fusion_score_normalization: bool = True
+    
     # chunking
     chunking_strategy: Literal["fixed", "recursive"] = "recursive"
     chunk_size: int = Field(default=400, ge=1)
