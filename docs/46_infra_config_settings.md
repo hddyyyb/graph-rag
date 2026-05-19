@@ -2,15 +2,25 @@
 
 ## Overview
 
-`Settings` is the **single source of truth configuration object** for the entire GraphRAG system.
 
-It is implemented using Pydantic `BaseModel` and is responsible for:
+## Configuration
 
-- defining all runtime configuration
-- validating configuration correctness
-- normalizing user input
-- enforcing cross-field constraints
-- enabling deterministic backend switching
+The project uses `Settings` as the centralized configuration entry.
+
+Runtime configuration is loaded from `.env` through Pydantic Settings.  
+A sample configuration file is provided as `.env.example`.
+
+Key configurable areas include:
+
+- retrieval parameters: `VECTOR_TOP_K`, `GRAPH_TOP_K`
+- fusion parameters: `FUSION_ALPHA`, `FUSION_BETA`
+- fusion score normalization: `ENABLE_FUSION_SCORE_NORMALIZATION`
+- graph retrieval parameters: expansion limits, hit weights, expansion score cap
+- backend selectors: memory / sqlite / qdrant, memory / neo4j
+- infrastructure connection settings: Neo4j and Qdrant
+- logging level: `LOG_LEVEL`
+
+The API container reads these values from `Settings` and injects them into application services and infrastructure adapters.
 
 This class is the foundation of the system’s **Clean Architecture configuration layer**. :contentReference[oaicite:0]{index=0}
 

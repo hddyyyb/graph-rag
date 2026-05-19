@@ -7,7 +7,7 @@ from graph_rag.infra.adapters.qdrant_vector_store import QdrantVectorStore
 def test_qdrant_upsert_and_search_with_docker():
     store = QdrantVectorStore(
         host="localhost",
-        port=6334,
+        grpc_port=6334,      # ✅ 明确用 grpc_port
         collection_name="test_graphrag_qdrant",
     )
 

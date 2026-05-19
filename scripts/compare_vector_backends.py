@@ -5,7 +5,7 @@ Usage:
     python scripts/compare_vector_backends.py
 
 Requirements:
-    - qdrant: Qdrant server running at localhost:6333
+    - qdrant: Qdrant server running at localhost:6334
     - sqlite: no external dependency (uses :memory:)
 
 embedding_backend defaults to "hash" (deterministic, no model file needed).

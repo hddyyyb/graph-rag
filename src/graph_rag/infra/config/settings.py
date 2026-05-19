@@ -11,7 +11,8 @@ class Settings(BaseSettings):    # 定义整个GraphRAG系统的配置对象
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
-    )
+    )  # pydantic-settings 在每次实例化 Settings() 时自动读取 .env 文件，优先级顺序为：
+    # 构造函数直接传参  >  OS 环境变量  >  .env 文件  >  字段默认值
     app_name: str = "graph-rag"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     
@@ -19,7 +20,9 @@ class Settings(BaseSettings):    # 定义整个GraphRAG系统的配置对象
     vector_top_k: int = Field(default=5, ge=1)  # ge = greater than or equal， 必须是 整数，且 ≥ 1
     graph_top_k: int = Field(default=5, ge=1)
 
-    # retrieval fusion
+    # fusion
+    fusion_alpha: float = Field(default=0.5, ge=0, le=1)  # [0,1], 向量相似度的权重
+    fusion_beta: float = Field(default=0.5, ge=0, le=1)   # [0,1], 图相似度的权重
     enable_fusion_score_normalization: bool = True
     
     # chunking
@@ -45,19 +48,22 @@ class Settings(BaseSettings):    # 定义整个GraphRAG系统的配置对象
     # qdrant
     qdrant_host: str = "localhost"
     qdrant_port: int = Field(default=6333, ge=1)
-    qdrant_collection_name: str = "graphrag_dev"
+    qdrant_grpc_port: int = Field(default=6334, ge=1)
+    qdrant_collection_name: str = "graph_rag"
+    qdrant_prefer_grpc: bool = True
+
+
+
 
     # 把Graph Retrieval V2也纳入统一配置系统
-    graph_expand_hops: int = 1
+    graph_expand_hops: int = Field(default=1, ge=0)
     graph_expand_per_term_limit: int = Field(default=2, ge=1)  # ≥ 1, 每个 query term 最多扩展多少个“相关 term”
     graph_max_expanded_terms: int = Field(default=10, ge=1)     # ≥ 1, 最多扩展多少个 term
     
     graph_direct_hit_weight: float = Field(default=1.0, gt=0)  # > 0, 原始 query term 命中的权重
     graph_expanded_hit_weight: float = Field(default=0.5, ge=0)  # 可以为0, 图扩展 term 命中的权重
 
-    # fusion
-    fusion_alpha: float = Field(default=0.5, ge=0, le=1)  # [0,1], 向量相似度的权重
-    fusion_beta: float = Field(default=0.5, ge=0, le=1)   # [0,1], 图相似度的权重
+    graph_expansion_score_cap: float | None = Field(default=2.0, ge=0)
 
     # neo4j
     neo4j_uri: str = "bolt://localhost:7687"
@@ -86,7 +92,7 @@ class Settings(BaseSettings):    # 定义整个GraphRAG系统的配置对象
         "llm_backend",
         "chunking_strategy",
         mode="before",
-    )  # 对这4个字段，在“赋值之前”统一做处理，mode="before"-在 Pydantic 做类型检查之前执行
+    )  # 对这些枚举型配置字段，在赋值之前统一做 strip/lower 处理，mode="before"-在 Pydantic 做类型检查之前执行
     @classmethod  # 这个函数属于类，而不是某个实例
     def normalize_lower(cls, v: str):    
         if isinstance(v, str):
@@ -125,34 +131,3 @@ class Settings(BaseSettings):    # 定义整个GraphRAG系统的配置对象
             raise ValueError("graph_expanded_hit_weight should not exceed graph_direct_hit_weight")
 
         return self
-    '''
-    main.py:
-    settings_override
-        ↓
-    build_settings()
-        ↓
-    Settings对象（唯一配置源）
-        ↓
-    build_container(settings)
-        ↓
-    所有组件统一读取 settings
-    '''
-
-    '''
-    Infra层
-    ↓
-    Settings
-    ↓
-    DI容器读取
-    ↓
-    注入Service
-    '''
-
-
-    '''用户输入（混乱、不可信）
-        ↓
-field_validator（清洗）
-        ↓
-model_validator（校验）
-        ↓
-得到一个“绝对可靠”的 Settings'''

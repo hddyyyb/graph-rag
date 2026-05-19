@@ -724,39 +724,48 @@ Developers can inspect retrieval behavior from three levels:
 
 ---
 
-## Day43 — Engineering Quality Improvement
+## Day43 — Engineering Quality Improvement ✅ Completed
 
-### Tasks
+### Completed
 
-- review Settings structure and retrieval config naming
-- organize retrieval-related configs:
-  - vector_top_k
-  - graph_top_k
-  - fusion_alpha
-  - fusion_beta
-  - enable_fusion_score_normalization
-- consider adding `.env.example`
-- improve exception handling
-- reduce hardcoded parameters
-- improve code readability and consistency
-- clean temporary debugging logic if necessary
-- review logging field naming consistency
-- improve maintainability of retrieval pipeline code
+- reviewed `Settings` structure and retrieval-related configuration naming
+- confirmed `Settings -> main.py -> QueryService / GraphStore` configuration injection path
+- confirmed `graph_expansion_score_cap` is connected to:
+  - Settings
+  - API container initialization
+  - InMemoryGraphStore
+  - Neo4jGraphStore
+  - retrieval_debug / scoring_overview
+  - tests
+- aligned `scripts/helpers.py` default fusion configuration with Settings
+- added configurable `enable_fusion_score_normalization` in script helper construction
+- added validation constraints for graph retrieval configuration fields
+- improved QueryService input validation:
+  - empty query
+  - non-string query
+  - invalid top_k
+  - invalid min_score
+  - disabled vector and graph retrieval at the same time
+- reviewed structured retrieval logging
+- aligned logging field names for fusion weights
+- confirmed no temporary `print()` statements exist in core runtime path
+- added `.env.example` as a complete configuration template
+- documented configuration usage
+- ran full test suite successfully
 
-### Constraints
+### Constraints Followed
 
-- avoid business logic redesign
-- avoid large refactors
-- do not change retrieval scoring logic
-- focus on maintainability and code quality
+- did not modify retrieval scoring logic
+- did not modify retrieval pipeline
+- did not introduce reranker
+- did not perform large refactoring
+- did not introduce new infrastructure
+- focused on maintainability and engineering quality
 
----
+### Result
 
-## Goal
+Day43 improved the maintainability and production-readiness of the GraphRAG project by centralizing configuration, clarifying runtime configuration behavior, strengthening input validation, and improving logging consistency without changing retrieval behavior.
 
-- improve engineering quality
-- strengthen production-oriented coding habits
-- improve long-term maintainability of the project
 ---
 
 ## Phase 8 — Advanced Retrieval Exploration (Optional)

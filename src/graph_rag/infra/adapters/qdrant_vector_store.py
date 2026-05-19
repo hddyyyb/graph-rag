@@ -33,14 +33,17 @@ class QdrantVectorStore:
     def __init__(
         self,
         host: str = "localhost",
-        port: int = 6334,
+        port: int = 6333,  # REST/HTTP 的端口
+        grpc_port: int = 6334,
+        prefer_grpc: bool = True,
         collection_name: str = "graph_rag",
     ) -> None:
         # 创建一个连接Qdrant的客户端
         self._client = QdrantClient(
             host=host, 
-            port=port,
-            prefer_grpc=True,  # HTTP (6333), gRPC (6334)
+            port=port,           # REST 端口
+            grpc_port=grpc_port, # gRPC 端口
+            prefer_grpc=prefer_grpc,
             check_compatibility=False, # avoid version-check issues in local/proxy env
             )
         self._collection = collection_name

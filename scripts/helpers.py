@@ -48,8 +48,9 @@ def build_query_service(
     trace: Optional[TracePort] = None,
     vector_top_k: int = 5,
     graph_top_k: int = 5,
-    fusion_alpha: float = 1.0,
-    fusion_beta: float = 1.0,
+    fusion_alpha: float = 0.5,
+    fusion_beta: float = 0.5,
+    enable_fusion_score_normalization: bool = True,
 ) -> QueryService:
     return QueryService(
         vector_store=vector_store or InMemoryVectorStore(),
@@ -62,7 +63,7 @@ def build_query_service(
         graph_top_k=graph_top_k,
         fusion_alpha= fusion_alpha,
         fusion_beta =fusion_beta,
-        enable_fusion_score_normalization=True,
+        enable_fusion_score_normalization=enable_fusion_score_normalization,
     )
 
 def build_ingest_service(

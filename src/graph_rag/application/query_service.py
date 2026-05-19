@@ -215,7 +215,9 @@ class QueryService:
                 source = "graph"
 
             final_score = alpha * item["vector_score"] + beta * item["graph_score"]
-
+            # final_score means the final fused score after combining vector and graph scores.
+            # It is different from the "final" retrieval stage after post-processing.
+            
             fused_chunk = RetrievedChunk(
                 doc_id=item["doc_id"],
                 chunk_id=item["chunk_id"],
@@ -265,7 +267,10 @@ class QueryService:
     
 
     def _validate_query(self, query: str) -> str:
-        q = (query or "").strip()
+        if not isinstance(query, str):
+            raise ValidationError("Query must be a string")
+        
+        q = query.strip()
         if not q:
             raise ValidationError("Query must not be empty")
         return q
@@ -738,8 +743,8 @@ class QueryService:
             postprocess_removed_count=summary.get("postprocess_removed_count"),
             normalization_enabled=summary.get("normalization_enabled"),
             normalization_method=summary.get("normalization_method"),
-            alpha=fusion.get("alpha"),
-            beta=fusion.get("beta"),
+            fusion_alpha=fusion.get("alpha"),
+            fusion_beta=fusion.get("beta"),
             expansion_score_cap=graph.get("expansion_score_cap"),
             has_expansion_capped_result=graph.get("has_expansion_capped_result"),
             top1_doc_id=top1.get("doc_id"),

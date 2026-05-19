@@ -1,7 +1,7 @@
 """
 Observe Qdrant vector retrieval behavior across queries, top_k values, and repeated runs.
 Usage: python scripts/inspect_qdrant_behavior.py
-Requires: Qdrant running at localhost:6333
+Requires: Qdrant running at localhost:6334
 """
 import sys
 from pathlib import Path

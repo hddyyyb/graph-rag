@@ -54,6 +54,7 @@ def build_graph_store(settings: Settings):
             direct_hit_weight=settings.graph_direct_hit_weight,
             expanded_hit_weight=settings.graph_expanded_hit_weight,
             max_expanded_terms=settings.graph_max_expanded_terms,
+            expansion_score_cap=settings.graph_expansion_score_cap,
         )
         return graph_store
 
@@ -70,6 +71,7 @@ def build_graph_store(settings: Settings):
             direct_hit_weight=settings.graph_direct_hit_weight,
             expanded_hit_weight=settings.graph_expanded_hit_weight,
             max_expanded_terms=settings.graph_max_expanded_terms,
+            expansion_score_cap=settings.graph_expansion_score_cap,
         )
 
     raise ValueError(f"Unsupported graph_store_backend: {settings.graph_store_backend}")
@@ -141,6 +143,8 @@ def build_container(settings: Settings) -> Dict[str, Any]:
         vector_store = QdrantVectorStore(
             host=settings.qdrant_host,
             port=settings.qdrant_port,
+            grpc_port=settings.qdrant_grpc_port,
+            prefer_grpc=settings.qdrant_prefer_grpc,
             collection_name=settings.qdrant_collection_name,
         )
     else:
